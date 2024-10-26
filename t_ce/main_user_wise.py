@@ -73,8 +73,8 @@ def parse_args():
     parser.add_argument("--mlp_layers",
         type=int,
         nargs='+',
-        default=[64, 32],
-        help="number of layers in MLP model, default: [64, 32]",)
+        default=[128, 64],
+        help="number of layers in MLP model, default: [128, 64]",)
     parser.add_argument("--num_ng",
         type=int,
         default=1,

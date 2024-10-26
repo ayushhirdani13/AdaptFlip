@@ -37,9 +37,6 @@ class NeuMF(nn.Module):
         self.embed_item_GMF = nn.Embedding(item_num, factor_num)
 
         assert (
-            mlp_layers[-1] == factor_num
-        ), "Final layer in MLP should have dimension = factor_num"
-        assert (
             mlp_layers[0] % 2 == 0
         ), "MLP first layer should be even as the outputs of MLP Embeddings are concatenated"
         self.embed_user_MLP = nn.Embedding(user_num, mlp_layers[0] // 2)
@@ -51,6 +48,7 @@ class NeuMF(nn.Module):
             mlp_modules.append(nn.Dropout(p=self.dropout))
             mlp_modules.append(nn.Linear(mlp_layers[i], mlp_layers[i + 1]))
             mlp_modules.append(nn.ReLU())
+        mlp_modules.append(nn.Linear(mlp_layers[-1], factor_num))
         self.MLP_layers = nn.Sequential(*mlp_modules)
 
         predict_size = 2 * factor_num
