@@ -1,0 +1,48 @@
+nohup: ignoring input
+Configurations:
+dataset : movielens
+model : GMF
+drop_rate : 0.0
+num_gradual : 0
+exponent : 1
+lr : 0.001
+dropout : 0.0
+batch_size : 1
+epochs : 30
+eval_freq : 2000
+top_k : [3, 5, 10, 20]
+best_k : 3
+factor_num : 32
+mlp_layers : [64, 32]
+num_ng : 1
+out : True
+gpu : 0
+best_k_ind : 0
+model_path : models/movielens/user_wise/GMF_0.0-0_1@3.pth
+Data Loaded
+Users: 6040, Items: 3706
+Number of Interactions: 800193
+Test Users: 6024
+Epoch[001/030], Train Loss: 0.6932
+Epoch[001/030], Eval Loss: 4186.5422
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.0038  0.0008  0.0036  0.0065
+@5      0.0040  0.0013  0.0040  0.0083
+@10     0.0041  0.0027  0.0043  0.0108
+@20     0.0041  0.0054  0.0051  0.0132
+################### TEST END ######################
+
+Traceback (most recent call last):
+  File "/media/ayushhirdani/Crucial/Denoising/github_repos/AdaptFlip/t_ce/main_user_wise.py", line 269, in <module>
+    torch.save(
+  File "/home/ayushhirdani/Desktop/ml/lib/python3.12/site-packages/torch/serialization.py", line 651, in save
+    with _open_zipfile_writer(f) as opened_zipfile:
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ayushhirdani/Desktop/ml/lib/python3.12/site-packages/torch/serialization.py", line 525, in _open_zipfile_writer
+    return container(name_or_buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ayushhirdani/Desktop/ml/lib/python3.12/site-packages/torch/serialization.py", line 496, in __init__
+    super().__init__(torch._C.PyTorchFileWriter(self.name))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: File models/movielens/user_wise/GMF_0.0-0_1@3.pth cannot be opened.
