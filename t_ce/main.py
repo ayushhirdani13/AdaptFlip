@@ -194,6 +194,12 @@ if __name__ == "__main__":
     DATAPATH = f"../data/{DATASET}"
     MODEL_DIR = f"models/{DATASET}"
     RESULT_DIR = f"results/{DATASET}"
+    if args.batch_mode == 'user':
+        RESULT_DIR += '/user_wise'
+        MODEL_DIR += '/user_wise'
+    elif args.batch_mode == 'item':
+        RESULT_DIR += '/item_wise'
+        MODEL_DIR += '/item_wise'
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
 

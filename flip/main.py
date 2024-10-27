@@ -248,6 +248,14 @@ if __name__ == "__main__":
     MODEL_DIR = f"models/{DATASET}"
     RESULT_DIR = f"results/{DATASET}"
     OUTPUT_SAVE_DIR = f"outputs/{DATASET}/{args.model}_{args.W}-{args.alpha}@{args.best_k}"
+    if args.batch_mode == 'user':
+        RESULT_DIR += '/user_wise'
+        MODEL_DIR += '/user_wise'
+        OUTPUT_SAVE_DIR += '/user_wise'
+    elif args.batch_mode == 'item':
+        RESULT_DIR += '/item_wise'
+        MODEL_DIR += '/item_wise'
+        OUTPUT_SAVE_DIR += '/item_wise'
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
 
