@@ -4,14 +4,15 @@ import argparse
 import numpy as np
 import pandas as pd
 import random
+from collections import defaultdict
 
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 import data_utils
 import models
-from loss import truncated_loss
 import evaluate
 
 def parse_args():
@@ -20,24 +21,20 @@ def parse_args():
         type=str,
         help="dataset used for training, options: movielens, default: movielens",
         default="movielens",
-        choices=['movielens'])
+        choices=["movielens"])
     parser.add_argument("--model",
         type=str,
         help="model used for training. options: GMF, NeuMF, default: NeuMF",
         default="NeuMF",
-        choices=['GMF', 'NeuMF'])
-    parser.add_argument("--drop_rate",
-        type=float,
-        help="drop rate, default: 0.2",
-        default=0.2)
-    parser.add_argument("--num_gradual",
+        choices=["GMF", "NeuMF"])
+    parser.add_argument("--W",
         type=int,
-        default=30000,
-        help="how many epochs to linearly increase drop_rate, default: 30000",)
-    parser.add_argument("--exponent",
-        type=float,
+        help="Window size, default: 2",
+        default=2)
+    parser.add_argument("--alpha",
+        type=int,
         default=1,
-        help="exponent of the drop rate {0.5, 1, 2}, default: 1",)
+        help="alpha in Q3 + alpha * IQR, default: 1",)
     parser.add_argument("--lr",
         type=float,
         default=0.001,
@@ -137,39 +134,95 @@ def test(model, test_data_pos, user_pos):
 
 ########################### Eval #####################################
 @torch.no_grad()
-def evalModel(model, valid_loader, count, device='cuda'):
+def evalModel(model, valid_loader, epoch, valid_log, valid_log_buffer, device='cuda'):
     model.eval()
     epoch_loss = 0
     valid_loader.dataset.ng_sample()
-    for user, item, label, _ in valid_loader:
+    flip_inds_buffer = set()
+    for user, item, label, train_label, _, idx in valid_loader:
         user = user.to(device)
         item = item.to(device)
-        label = label.float().to(device)
+        train_label = train_label.float().to(device)
+        # label = label.float().to(device)
 
         prediction = model(user, item)
-        loss = truncated_loss(prediction, label, drop_rate=drop_rate_schedule(count))
+        loss_all = F.binary_cross_entropy_with_logits(prediction, train_label, reduction='none')
+        loss = torch.mean(loss_all)
         epoch_loss += loss.item()
+
+        # Convert tensors to CPU and NumPy arrays for logging
+        user_cpu = user.cpu().numpy()
+        item_cpu = item.cpu().numpy()
+        train_label_cpu = train_label.cpu().numpy()
+        loss_all_cpu = loss_all.cpu().detach().numpy()
+        idx_cpu = idx.cpu().numpy()
+        label_cpu = label.cpu().numpy()
+        pos_mask = label_cpu == 1
+
+        pos_indices = np.where(pos_mask)[0]
+
+        for ind in pos_indices:
+            u = user_cpu[ind]
+            i = item_cpu[ind]
+
+            # Update valid_log in batch
+            loss_val = loss_all_cpu[ind]
+            valid_label = int(train_label_cpu[ind])
+            valid_log_buffer.append([u, i, epoch, f"{loss_val:.4f}", valid_label])
+            valid_log[(u, i)].append(loss_val)
+        if (epoch+1) % args.W == 0:
+            flip_inds = flipper(user_cpu[pos_mask], item_cpu[pos_mask], idx_cpu[pos_mask], valid_log, args.W)
+            flip_inds_buffer.update(flip_inds)
+
+    if (epoch+1) % args.W == 0:
+        print("Valid Dataset State")
+        valid_loader.dataset.flip_labels(list(flip_inds_buffer))
+        flip_inds_buffer.clear()
+        if args.out:
+            valid_loader.dataset.save_state(epoch=epoch, mode='valid', SAVE_DIR=OUTPUT_SAVE_DIR)
     return epoch_loss
+
+def flipper(user, item, idx, loss_log, W):
+    user_item_pairs = np.column_stack((user, item))
+    avg_losses = np.array([np.mean(loss_log[tuple(pair)][-W:]) for pair in user_item_pairs])
+    for pair in user_item_pairs:
+        if len(loss_log[tuple(pair)]) == 0:
+            print(pair)
+
+    # Calculate thresholds using IQR (Interquartile Range)
+    avg_Q1, avg_Q3 = np.quantile(avg_losses, [0.25, 0.75])
+    avg_IQR = avg_Q3 - avg_Q1
+    avg_upper = avg_Q3 + args.alpha * avg_IQR
+
+    # Determine indices where average loss exceeds the threshold
+    flip_inds = idx[avg_losses > avg_upper].tolist()
+
+    return flip_inds
 
 def custom_collate_fn(batch):
     user_tensors = []
     item_tensors = []
     label_tensors = []
+    train_label_tensors = []
     true_label_tensors = []
+    idx_tensors = []
 
-    for user, item, label, true_label in batch:
+    for user, item, label, train_label, true_label, idx in batch:
         user_tensors.append(torch.tensor(user))
         item_tensors.append(torch.tensor(item))
         label_tensors.append(torch.tensor(label))
+        train_label_tensors.append(torch.tensor(train_label))
         true_label_tensors.append(torch.tensor(true_label))
+        idx_tensors.append(torch.tensor(idx))
 
     users = torch.cat(user_tensors, dim=0)
     items = torch.cat(item_tensors, dim=0)
     labels = torch.cat(label_tensors, dim=0)
+    train_labels = torch.cat(train_label_tensors, dim=0)
     true_labels = torch.cat(true_label_tensors, dim=0)
+    idxs = torch.cat(idx_tensors, dim=0)
 
-    return users, items, labels, true_labels
-
+    return users, items, labels, train_labels, true_labels, idxs
 
 def worker_init_fn(worker_id):
     np.random.seed(2024 + worker_id)
@@ -194,10 +247,11 @@ if __name__ == "__main__":
     DATAPATH = f"../data/{DATASET}"
     MODEL_DIR = f"models/{DATASET}"
     RESULT_DIR = f"results/{DATASET}"
+    OUTPUT_SAVE_DIR = f"outputs/{DATASET}/{args.model}_{args.W}-{args.alpha}@{args.best_k}"
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
 
-    MODEL_FILE = f"{args.model}_{args.drop_rate}-{args.num_gradual}@{args.best_k}.pth"
+    MODEL_FILE = f"{args.model}_{args.W}-{args.alpha}@{args.best_k}.pth"
     args.model_path = os.path.join(MODEL_DIR, MODEL_FILE)
 
     print("Configurations:")
@@ -240,13 +294,13 @@ if __name__ == "__main__":
     else:
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
         valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
-    
+
     if args.model == "GMF":
         model = models.GMF(user_num, item_num, args.factor_num).to(device)
     elif args.model == "NeuMF":
         model = models.NeuMF(user_num, item_num, args.factor_num, args.mlp_layers, args.dropout).to(device)
     else:
-        raise ValueError("No model named as {}".format(args.model))
+        raise ValueError(f"No model named as {args.model}")
     print(model)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
@@ -255,40 +309,122 @@ if __name__ == "__main__":
     best_loss, best_recall = 1e9, 0.0
     best_recall_idx = 0
     test_results = []
-    losses = []
     start_time = time()
+
+    train_log = defaultdict(list)
+    valid_log = defaultdict(list)
+
+    train_log_buffer = []
+    valid_log_buffer = []
+    training_losses_buffer = []
+    flip_inds_buffer = set()
+
+    if args.out == True:
+        RUNS_DIR = f"runs/{args.dataset}"
+        os.makedirs(RUNS_DIR, exist_ok=True)
+        training_losses_file = os.path.join(RUNS_DIR, f"training_losses_{args.model}_{args.W}-{args.alpha}@{args.best_k}.csv")
+        train_logs_file = os.path.join(RUNS_DIR, f"train_logs_{args.model}_{args.W}-{args.alpha}@{args.best_k}.csv")
+        valid_logs_file = os.path.join(RUNS_DIR, f"valid_logs_{args.model}_{args.W}-{args.alpha}@{args.best_k}.csv")
+
+        ## Clear File contents before run
+        open(training_losses_file, 'w').close()
+        open(train_logs_file, 'w').close()
+        open(valid_logs_file, 'w').close()
 
     for epoch in range(args.epochs):
         model.train()
         epoch_loss = 0
         train_loader.dataset.ng_sample()
-        for i, (user, item, label, true_label) in enumerate(train_loader):
+
+        if (epoch+1) % args.W == 0:
+            print("#################### Flipping Epoch ##########################")
+        for i, (user, item, label, train_label, true_label, idx) in enumerate(train_loader):
             user = user.to(device)
             item = item.to(device)
-            label = label.float().to(device)
+            train_label = train_label.float().to(device)
+            # label = label.float().to(device)
 
             prediction = model(user, item)
-            loss = truncated_loss(prediction, label, drop_rate=drop_rate_schedule(count))
+            loss_all = F.binary_cross_entropy_with_logits(prediction, train_label, reduction='none')
+            loss = torch.mean(loss_all)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
+
+            # Convert tensors to CPU and NumPy arrays for logging
+            user_cpu = user.cpu().numpy()
+            item_cpu = item.cpu().numpy()
+            train_label_cpu = train_label.cpu().int().numpy()
+            loss_all_cpu = loss_all.cpu().detach().numpy()
+            idx_cpu = idx.cpu().numpy()
+            label_cpu = label.cpu().numpy()
+            pos_mask = label_cpu == 1
+            true_label_cpu = true_label.cpu().numpy()
+
+            tp_loss = loss_all_cpu[(train_label_cpu == 1) & (true_label_cpu == 1)].sum()
+            fp_loss = loss_all_cpu[(train_label_cpu == 0) & (true_label_cpu == 1)].sum()
+            loss_val = loss.item()
+
+            training_losses_buffer.append([epoch, f"{tp_loss:.4f}", f"{fp_loss:.4f}", f"{loss_val:.4f}"])
+
+            pos_indices = np.where(pos_mask)[0]
+
+            for ind in pos_indices:
+                u = user_cpu[ind]
+                i = item_cpu[ind]
+
+                # Update train_log in batch
+                loss_val = loss_all_cpu[ind]
+                train_label = int(train_label_cpu[ind])
+                train_log_buffer.append([u, i, epoch, f"{loss_val:.4f}", train_label])
+                train_log[(u, i)].append(loss_val)
+            if (epoch+1) % args.W == 0:
+                flip_inds = flipper(user_cpu[pos_mask], item_cpu[pos_mask], idx_cpu[pos_mask], train_log, args.W)
+                flip_inds_buffer.update(flip_inds)
+
             epoch_loss += loss.item()
-            losses.append(loss.item())
             count += 1
         epoch_loss = epoch_loss / len(train_loader)
         print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Train Loss: {epoch_loss:.4f}")
 
-        eval_loss = evalModel(model, valid_loader, count)
+        if (epoch+1) % args.W == 0:
+            print("Train Dataset State")
+            train_loader.dataset.flip_labels(list(flip_inds_buffer))
+            flip_inds_buffer.clear()
+            if args.out:
+                train_loader.dataset.save_state(epoch=epoch, mode='train', SAVE_DIR=OUTPUT_SAVE_DIR)
+
+        eval_loss = evalModel(model, valid_loader, epoch, valid_log, valid_log_buffer, device=device)
         print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Eval Loss: {eval_loss:.4f}")
         curr_recall, curr_test_results = test(model, test_data_pos, user_pos)
         curr_test_results["Validation Loss"] = eval_loss
 
+
+        if args.out == True:
+            if len(training_losses_buffer) > 0:
+                with open(training_losses_file, 'a', newline='') as f:
+                    NAMES = ["epoch", "tp_loss", "fp_loss", "loss"]
+                    df = pd.DataFrame(training_losses_buffer, columns=NAMES)
+                    df.to_csv(f, mode='a',index=False, header=False)
+
+            if len(train_log_buffer) > 0:
+                with open(train_logs_file, 'a', newline='') as f:
+                    NAMES = ["user", "item", "epoch", "loss", "train_label"]
+                    df = pd.DataFrame(train_log_buffer, columns=NAMES)
+                    df.to_csv(f, mode='a',index=False, header=False)
+
+            if len(valid_log_buffer) > 0:
+                with open(valid_logs_file, 'a', newline='') as f:
+                    NAMES = ["user", "item", "epoch", "loss", "train_label"]
+                    df = pd.DataFrame(valid_log_buffer, columns=NAMES)
+                    df.to_csv(f, mode='a',index=False, header=False)
+
         if curr_recall > best_recall:
             best_recall = curr_recall
             best_recall_idx = epoch
-            if args.out == True:
+            if args.out:
                 torch.save(
                     model,
                     args.model_path

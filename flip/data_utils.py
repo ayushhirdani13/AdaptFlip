@@ -86,6 +86,7 @@ class NCF_Dataset(Dataset):
         self.is_training = is_training
         self.num_ng = num_ng
         self.labels = np.ones(len(self.features), dtype=np.int32)
+        self.train_labels = np.ones(len(self.features), dtype=np.int32)
 
         self.user_num = user_num
         self.item_num = item_num
@@ -109,8 +110,49 @@ class NCF_Dataset(Dataset):
             self.features_fill = np.concatenate((self.features, self.negative_samples))
             self.labels_fill = np.concatenate((self.labels, np.zeros(self.negative_samples.shape[0], dtype=np.int32)))
             self.true_labels_fill = np.concatenate((self.true_labels, np.zeros(self.negative_samples.shape[0], dtype=np.int32)))
+            self.train_labels_fill = np.concatenate((self.train_labels, np.zeros(self.negative_samples.shape[0], dtype=np.int32)))
             assert self.features_fill.shape[0] == self.labels_fill.shape[0]
             assert self.features_fill.shape[0] == self.true_labels_fill.shape[0]
+            assert self.features_fill.shape[0] == self.train_labels_fill.shape[0]
+    
+    def flip_labels(self, indices):
+        assert self.is_training != 2, "no flipping when testing"
+
+        indices = np.array(indices, dtype=np.int32)
+        valid_indices = indices[indices < len(self.train_labels)]
+        flip0_1 = (self.train_labels[valid_indices] == 0).sum()
+        flip1_0 = (self.train_labels[valid_indices] == 1).sum()
+        self.train_labels[valid_indices] = 1 - self.train_labels[valid_indices]
+        print(f"Flips 0 to 1: {flip0_1}")
+        print(f"Flips 1 to 0: {flip1_0}")
+        self.get_state()
+
+    def get_state(self):
+        train_pos_mask = self.train_labels == 1
+        train_neg_mask = self.train_labels == 0
+        true_pos_mask = self.true_labels == 1
+        true_neg_mask = self.true_labels == 0
+
+        pos_train = np.sum(train_pos_mask)
+        neg_train = np.sum(train_neg_mask)
+        print(f"train_pos: {pos_train}, train_neg: {neg_train}")
+
+        true_pos = np.sum(train_pos_mask & true_pos_mask)
+        true_neg = np.sum(train_neg_mask & true_neg_mask)
+        false_pos = np.sum(train_pos_mask & true_neg_mask)
+        false_neg = np.sum(train_neg_mask & true_pos_mask)
+        print(f"true_pos: {true_pos}, true_neg: {true_neg}, false_pos: {false_pos}, false_neg: {false_neg}")
+
+    def save_state(self, epoch=0, mode='train', SAVE_DIR=""):
+        if SAVE_DIR:
+            os.makedirs(SAVE_DIR, exist_ok=True)
+            SAVE_PATH = os.path.join(SAVE_DIR, f"{mode}_{epoch}.csv")
+        else:
+            SAVE_PATH = f"{mode}_{epoch}.csv"
+        user = self.features[:, 0]
+        item = self.features[:, 1]
+        train_label = self.train_labels
+        pd.DataFrame({"user": user, "item": item, "train_label": train_label}).to_csv(SAVE_PATH, index=False, header=False, sep="\t")
 
     def __len__(self):
         return len(self.features) * (self.num_ng + 1)
@@ -119,13 +161,15 @@ class NCF_Dataset(Dataset):
         features = self.features_fill if self.is_training != 2 else self.features_ps
         labels = self.labels_fill if self.is_training != 2 else self.labels
         true_labels = self.true_labels_fill if self.is_training != 2 else self.true_labels
+        train_labels = self.train_labels_fill if self.is_training != 2 else self.train_labels
 
         user = features[idx][0]
         item = features[idx][1]
         label = labels[idx]
+        train_label = train_labels[idx]
         true_label = true_labels[idx]
 
-        return user, item, label, true_label
+        return user, item, label, train_label, true_label, idx
     
 class NCF_UserWise_Dataset(NCF_Dataset):
     def __len__(self):
@@ -135,14 +179,17 @@ class NCF_UserWise_Dataset(NCF_Dataset):
         features = self.features_fill if self.is_training != 2 else self.features_ps
         labels = self.labels_fill if self.is_training != 2 else self.labels
         true_labels = self.true_labels_fill if self.is_training != 2 else self.true_labels
+        train_labels = self.train_labels_fill if self.is_training != 2 else self.train_labels
 
         user_mask = features[:, 0] == user_id
         user = features[user_mask, 0]
         item = features[user_mask, 1]
         labels = labels[user_mask]
         true_labels = true_labels[user_mask]
+        train_labels = train_labels[user_mask]
+        idx = np.where(user_mask)[0]
 
-        return user, item, labels, true_labels
+        return user, item, labels, train_labels, true_labels, idx
     
 class NCF_ItemWise_Dataset(NCF_Dataset):
     def __len__(self):
@@ -152,11 +199,14 @@ class NCF_ItemWise_Dataset(NCF_Dataset):
         features = self.features_fill if self.is_training != 2 else self.features_ps
         labels = self.labels_fill if self.is_training != 2 else self.labels
         true_labels = self.true_labels_fill if self.is_training != 2 else self.true_labels
+        train_labels = self.train_labels_fill if self.is_training != 2 else self.train_labels
 
         item_mask = features[:, 1] == item_id
         user = features[item_mask, 0]
         item = features[item_mask, 1]
         labels = labels[item_mask]
         true_labels = true_labels[item_mask]
+        train_labels = train_labels[item_mask]
+        idx = np.where(item_mask)[0]
 
-        return user, item, labels, true_labels
+        return user, item, labels, train_labels, true_labels, idx
