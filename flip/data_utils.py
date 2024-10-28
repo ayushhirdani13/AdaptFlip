@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from collections import defaultdict
+from sklearn.metrics.pairwise import cosine_similarity
 
 from torch.utils.data import Dataset
 
@@ -208,5 +209,75 @@ class NCF_ItemWise_Dataset(NCF_Dataset):
         true_labels = true_labels[item_mask]
         train_labels = train_labels[item_mask]
         idx = np.where(item_mask)[0]
+
+        return user, item, labels, train_labels, true_labels, idx
+
+class NCF_NeighborWise_Dataset(NCF_Dataset):
+    def __init__(self, user_num, item_num, features, train_mat, true_labels, is_training=0, num_ng=1, group_size=2):
+        super().__init__(user_num, item_num, features, train_mat, true_labels, is_training, num_ng)
+        assert group_size >= 1, "Group size must be at least 1"
+        self.group_size = group_size
+        self.assign_cluster_ids()
+        print(f"Cluster num: {self.cluster_num}")
+        print(f"Group size: {self.group_size}")
+        assert self.cluster_num == np.unique(self.clusters_per_user).shape[0]
+
+    def ng_sample(self):
+        super().ng_sample()
+        if self.num_ng == 0:
+            self.cluster_ids_fill = self.cluster_ids
+        else:
+            self.cluster_ids_fill = self.clusters_per_user[self.features_fill[:, 0]]
+
+    def assign_cluster_ids(self):
+        train_mat = self.train_mat.tocsr()
+        similarity_matrix = cosine_similarity(train_mat, dense_output=False)
+        self.cluster_num = self.user_num // self.group_size + (self.user_num % self.group_size != 0)
+        self.clusters_per_user = np.full(self.user_num, -1, dtype=np.int32)
+        cluster_id = 0
+        
+        for user in range(self.user_num):
+            if cluster_id == (self.user_num // self.group_size):
+                break
+            if self.clusters_per_user[user] != -1:
+                continue
+
+            self.clusters_per_user[user] = cluster_id
+            similar_users = np.argsort(-similarity_matrix[user].toarray().flatten())
+            self.clusters_per_user[user] = cluster_id
+            group_size = 1
+
+            for similar_user in similar_users[1:]:
+                if self.clusters_per_user[similar_user] == -1:
+                    self.clusters_per_user[similar_user] = cluster_id
+                    group_size += 1
+                    if group_size >= self.group_size:
+                        break
+            cluster_id += 1
+        ## Edge case
+        if cluster_id < self.cluster_num:
+            for user in range(self.user_num):
+                if self.clusters_per_user[user] == -1:
+                    self.clusters_per_user[user] = cluster_id
+        
+        self.cluster_ids = self.clusters_per_user[self.features[:, 0]]
+
+    def __len__(self):
+        return self.cluster_num
+
+    def __getitem__(self, cluster_id):
+        features = self.features_fill if self.is_training != 2 else self.features_ps
+        labels = self.labels_fill if self.is_training != 2 else self.labels
+        true_labels = self.true_labels_fill if self.is_training != 2 else self.true_labels
+        train_labels = self.train_labels_fill if self.is_training != 2 else self.train_labels
+        cluster_ids = self.cluster_ids_fill if self.is_training != 2 else self.cluster_ids
+
+        cluster_mask = cluster_ids == cluster_id
+        user = features[cluster_mask, 0]
+        item = features[cluster_mask, 1]
+        labels = labels[cluster_mask]
+        true_labels = true_labels[cluster_mask]
+        train_labels = train_labels[cluster_mask]
+        idx = np.where(cluster_mask)[0]
 
         return user, item, labels, train_labels, true_labels, idx

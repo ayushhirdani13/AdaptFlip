@@ -46,8 +46,8 @@ def parse_args():
     parser.add_argument("--batch_mode",
         type=str,
         default="random",
-        help="batch by user, item or random, default: random",
-        choices=["user", "item", "random"])
+        help="batch by user, item, neighbor or random, default: random",
+        choices=["user", "item", "random", "neighbor"])
     parser.add_argument("--batch_size",
         type=int,
         default=1024,
@@ -83,6 +83,7 @@ def parse_args():
         default=1,
         help="sample negative items for training, default: 1")
     parser.add_argument("--out",
+        type=bool,
         default=True,
         help="save model or not, default: True")
     parser.add_argument("--gpu",
@@ -256,8 +257,13 @@ if __name__ == "__main__":
         RESULT_DIR += '/item_wise'
         MODEL_DIR += '/item_wise'
         OUTPUT_SAVE_DIR += '/item_wise'
+    elif args.batch_mode == 'neighbor':
+        RESULT_DIR += '/neighbor_wise'
+        MODEL_DIR += '/neighbor_wise'
+        OUTPUT_SAVE_DIR += '/neighbor_wise'
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_SAVE_DIR, exist_ok=True)
 
     MODEL_FILE = f"{args.model}_{args.W}-{args.alpha}@{args.best_k}.pth"
     args.model_path = os.path.join(MODEL_DIR, MODEL_FILE)
@@ -287,18 +293,26 @@ if __name__ == "__main__":
     DATASET_CONF = {
         'random': data_utils.NCF_Dataset,
         'user': data_utils.NCF_UserWise_Dataset,
-        'item': data_utils.NCF_ItemWise_Dataset
+        'item': data_utils.NCF_ItemWise_Dataset,
+        'neighbor': data_utils.NCF_NeighborWise_Dataset
     }
 
     Dataset = DATASET_CONF[args.batch_mode]
 
     ## Prepare Datasets
-    train_dataset = Dataset(user_num=user_num, item_num=item_num, features=train_data_list,train_mat=train_mat, true_labels=train_data_true_label, num_ng=args.num_ng)
-    valid_dataset = Dataset(user_num=user_num, item_num=item_num, features=valid_data_list,train_mat=train_mat, true_labels=valid_data_true_label, num_ng=args.num_ng)
+    if args.batch_mode == "neighbor":
+        train_dataset = Dataset(user_num=user_num, item_num=item_num, features=train_data_list,train_mat=train_mat, true_labels=train_data_true_label, num_ng=args.num_ng, group_size=args.batch_size)
+        valid_dataset = Dataset(user_num=user_num, item_num=item_num, features=valid_data_list,train_mat=train_mat, true_labels=valid_data_true_label, num_ng=args.num_ng, group_size=args.batch_size)
+    else:
+        train_dataset = Dataset(user_num=user_num, item_num=item_num, features=train_data_list,train_mat=train_mat, true_labels=train_data_true_label, num_ng=args.num_ng)
+        valid_dataset = Dataset(user_num=user_num, item_num=item_num, features=valid_data_list,train_mat=train_mat, true_labels=valid_data_true_label, num_ng=args.num_ng)
 
     if args.batch_mode == "random":
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn)
         valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn)
+    elif args.batch_mode == "neighbor":
+        train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
+        valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
     else:
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
         valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
@@ -375,7 +389,7 @@ if __name__ == "__main__":
             fp_loss = loss_all_cpu[(train_label_cpu == 0) & (true_label_cpu == 1)].sum()
             loss_val = loss.item()
 
-            training_losses_buffer.append([epoch, f"{tp_loss:.4f}", f"{fp_loss:.4f}", f"{loss_val:.4f}"])
+            training_losses_buffer.append([count, f"{tp_loss:.4f}", f"{fp_loss:.4f}", f"{loss_val:.4f}"])
 
             pos_indices = np.where(pos_mask)[0]
 
