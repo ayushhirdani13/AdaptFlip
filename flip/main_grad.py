@@ -21,20 +21,24 @@ def parse_args():
         type=str,
         help="dataset used for training, options: movielens, default: movielens",
         default="movielens",
-        choices=["movielens"])
+        choices=['movielens'])
     parser.add_argument("--model",
         type=str,
         help="model used for training. options: GMF, NeuMF, default: NeuMF",
         default="NeuMF",
-        choices=["GMF", "NeuMF"])
-    parser.add_argument("--W",
+        choices=['GMF', 'NeuMF'])
+    parser.add_argument("--drop_rate",
+        type=float,
+        help="drop rate, default: 0.2",
+        default=0.2)
+    parser.add_argument("--num_gradual",
         type=int,
-        help="Window size, default: 2",
-        default=2)
-    parser.add_argument("--alpha",
-        type=int,
+        default=30000,
+        help="how many epochs to linearly increase drop_rate, default: 30000",)
+    parser.add_argument("--exponent",
+        type=float,
         default=1,
-        help="alpha in Q3 + alpha * IQR, default: 1",)
+        help="exponent of the drop rate {0.5, 1, 2}, default: 1",)
     parser.add_argument("--lr",
         type=float,
         default=0.001,
@@ -43,15 +47,20 @@ def parse_args():
         type=float,
         default=0.0,
         help="dropout rate, default: 0.0",)
+    parser.add_argument("--batch_by",
+        type=str,
+        default="none",
+        help="batch by user, item or none, default: none",
+        choices=["none", "user", "item"])
     parser.add_argument("--batch_mode",
         type=str,
         default="random",
-        help="batch by user, item, neighbor, random, default: random",
-        choices=["user", "item", "random", "neighbor"])
+        help="batch mode: neighbor or random, default: random",
+        choices=["random", "neighbor"])
     parser.add_argument("--batch_size",
         type=int,
         default=1024,
-        help="batch size for training , default: 1024",)
+        help="batch size for training (group_size if batch_mode is neighbor), default: 1024",)
     parser.add_argument("--epochs",
         type=int,
         default=30,
@@ -83,15 +92,20 @@ def parse_args():
         default=1,
         help="sample negative items for training, default: 1")
     parser.add_argument("--out",
-        type=bool,
+        type=str,
         default=True,
         help="save model or not, default: True")
     parser.add_argument("--gpu",
         type=str,
         default="0",
         help="gpu card ID, default: 0")
+    args = parser.parse_args()
+    if args.out in ["False", "false", "0"]:
+        args.out = False
+    else:
+        args.out = True
 
-    return parser.parse_args()
+    return args
 
 def drop_rate_schedule(iteration):
 	drop_rate = np.linspace(0, args.drop_rate**args.exponent, args.num_gradual)
@@ -248,19 +262,10 @@ if __name__ == "__main__":
     DATAPATH = f"../data/{DATASET}"
     MODEL_DIR = f"models/{DATASET}"
     RESULT_DIR = f"results/{DATASET}"
-    OUTPUT_SAVE_DIR = f"outputs/{DATASET}/{args.model}_{args.W}-{args.alpha}@{args.best_k}"
-    if args.batch_mode == 'user':
-        RESULT_DIR += '/user_wise'
-        MODEL_DIR += '/user_wise'
-        OUTPUT_SAVE_DIR += '/user_wise'
-    elif args.batch_mode == 'item':
-        RESULT_DIR += '/item_wise'
-        MODEL_DIR += '/item_wise'
-        OUTPUT_SAVE_DIR += '/item_wise'
-    elif args.batch_mode == 'neighbor':
-        RESULT_DIR += '/neighbor_wise'
-        MODEL_DIR += '/neighbor_wise'
-        OUTPUT_SAVE_DIR += '/neighbor_wise'
+    OUTPUT_SAVE_DIR = f"outputs/{DATASET}"
+    RESULT_DIR += f'/{args.batch_mode}/{args.batch_by}'
+    MODEL_DIR += f'/{args.batch_mode}/{args.batch_by}'
+    OUTPUT_SAVE_DIR += f'/{args.batch_mode}/{args.batch_by}/{args.model}_{args.W}-{args.alpha}@{args.best_k}'
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
     os.makedirs(OUTPUT_SAVE_DIR, exist_ok=True)
@@ -290,24 +295,28 @@ if __name__ == "__main__":
     print(f"Number of Interactions: {len(train_data_list)}")
     print(f"Test Users: {len(test_data_pos)}")
 
-    DATASET_CONF = {
-        'random': data_utils.NCF_Dataset,
-        'user': data_utils.NCF_UserWise_Dataset,
-        'item': data_utils.NCF_ItemWise_Dataset
-    }
-
-    Dataset = DATASET_CONF[args.batch_mode]
-
     ## Prepare Datasets
-    train_dataset = Dataset(user_num=user_num, item_num=item_num, features=train_data_list,train_mat=train_mat, true_labels=train_data_true_label, num_ng=args.num_ng)
-    valid_dataset = Dataset(user_num=user_num, item_num=item_num, features=valid_data_list,train_mat=train_mat, true_labels=valid_data_true_label, num_ng=args.num_ng)
-
-    if args.batch_mode == "random":
+    if args.batch_by == 'none':
+        train_dataset = data_utils.NCF_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng)
+        valid_dataset = data_utils.NCF_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng)
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn)
         valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn)
     else:
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
-        valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
+        if args.batch_mode == 'neighbor':
+            train_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng, neighbor_type=args.batch_by)
+            valid_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng, neighbor_type=args.batch_by)
+            train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
+            valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
+        elif args.batch_by == 'user':
+            train_dataset = data_utils.NCF_UserWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng)
+            valid_dataset = data_utils.NCF_UserWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng)
+            train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
+            valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
+        elif args.batch_by == 'item':
+            train_dataset = data_utils.NCF_ItemWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng)
+            valid_dataset = data_utils.NCF_ItemWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng)
+            train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
+            valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
 
     if args.model == "GMF":
         model = models.GMF(user_num, item_num, args.factor_num).to(device)

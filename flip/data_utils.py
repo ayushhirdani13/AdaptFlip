@@ -213,54 +213,66 @@ class NCF_ItemWise_Dataset(NCF_Dataset):
         return user, item, labels, train_labels, true_labels, idx
 
 class NCF_NeighborWise_Dataset(NCF_Dataset):
-    def __init__(self, user_num, item_num, features, train_mat, true_labels, is_training=0, num_ng=1, group_size=2):
+    def __init__(self, user_num, item_num, features, train_mat, true_labels, is_training=0, num_ng=1, group_size=2, neighbor_type='user'):
         super().__init__(user_num, item_num, features, train_mat, true_labels, is_training, num_ng)
         assert group_size >= 1, "Group size must be at least 1"
         self.group_size = group_size
-        self.assign_cluster_ids()
+        self.neighbor_type = neighbor_type
+        self.assign_cluster_ids(neighbor_type)
         print(f"Cluster num: {self.cluster_num}")
         print(f"Group size: {self.group_size}")
         assert self.cluster_num == np.unique(self.clusters_per_user).shape[0]
 
     def ng_sample(self):
         super().ng_sample()
-        if self.num_ng == 0:
-            self.cluster_ids_fill = self.cluster_ids
+        if self.neighbor_type == 'user':
+            self.cluster_ids_fill = self.clusters_per_sample[self.features_fill[:, 0]]
         else:
-            self.cluster_ids_fill = self.clusters_per_user[self.features_fill[:, 0]]
+            self.cluster_ids_fill = self.clusters_per_sample[self.features_fill[:, 1]]
 
-    def assign_cluster_ids(self):
+    def assign_cluster_ids(self, neighbor_type):
         train_mat = self.train_mat.tocsr()
-        similarity_matrix = cosine_similarity(train_mat, dense_output=False)
-        self.cluster_num = self.user_num // self.group_size + (self.user_num % self.group_size != 0)
-        self.clusters_per_user = np.full(self.user_num, -1, dtype=np.int32)
+        if neighbor_type == 'user':
+            similarity_matrix = cosine_similarity(train_mat, dense_output=False)
+        elif neighbor_type == 'item':
+            similarity_matrix = cosine_similarity(train_mat.T, dense_output=False).tocsr()
+        
+        if neighbor_type == 'user':
+            self.cluster_num = self.user_num // self.group_size + (self.user_num % self.group_size != 0)
+        elif neighbor_type == 'item':
+            self.cluster_num = self.item_num // self.group_size + (self.item_num % self.group_size != 0)
+        unique_samples = self.user_num if neighbor_type == 'user' else self.item_num
+        self.clusters_per_sample = np.full(unique_samples, -1, dtype=np.int32)
         cluster_id = 0
         
-        for user in range(self.user_num):
-            if cluster_id == (self.user_num // self.group_size):
+        for sample in range(unique_samples):
+            if cluster_id == (unique_samples // self.group_size):
                 break
-            if self.clusters_per_user[user] != -1:
+            if self.clusters_per_sample[sample] != -1:
                 continue
 
-            self.clusters_per_user[user] = cluster_id
-            similar_users = np.argsort(-similarity_matrix[user].toarray().flatten())
-            self.clusters_per_user[user] = cluster_id
+            self.clusters_per_sample[sample] = cluster_id
+            similar_samples = np.argsort(-similarity_matrix[sample].toarray().flatten())
+            self.clusters_per_sample[sample] = cluster_id
             group_size = 1
 
-            for similar_user in similar_users[1:]:
-                if self.clusters_per_user[similar_user] == -1:
-                    self.clusters_per_user[similar_user] = cluster_id
+            for similar_sample in similar_samples[1:]:
+                if self.clusters_per_sample[similar_sample] == -1:
+                    self.clusters_per_sample[similar_sample] = cluster_id
                     group_size += 1
                     if group_size >= self.group_size:
                         break
             cluster_id += 1
         ## Edge case
         if cluster_id < self.cluster_num:
-            for user in range(self.user_num):
-                if self.clusters_per_user[user] == -1:
-                    self.clusters_per_user[user] = cluster_id
+            for sample in range(unique_samples):
+                if self.clusters_per_sample[sample] == -1:
+                    self.clusters_per_sample[sample] = cluster_id
         
-        self.cluster_ids = self.clusters_per_user[self.features[:, 0]]
+        if neighbor_type == 'user':
+            self.cluster_ids = self.clusters_per_sample[self.features[:, 0]]
+        elif neighbor_type == 'item':
+            self.cluster_ids = self.clusters_per_sample[self.features[:, 1]]
 
     def __len__(self):
         return self.cluster_num
