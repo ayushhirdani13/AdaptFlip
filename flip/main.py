@@ -413,6 +413,8 @@ if __name__ == "__main__":
             print("Train Dataset State")
             train_loader.dataset.flip_labels(list(flip_inds_buffer))
             flip_inds_buffer.clear()
+            train_log.clear()
+            valid_log.clear()
             if args.out:
                 train_loader.dataset.save_state(epoch=epoch, mode='train', SAVE_DIR=OUTPUT_SAVE_DIR)
 
