@@ -1,0 +1,289 @@
+Configurations:
+dataset : movielens
+model : NeuMF
+W : 2
+alpha : 1
+lr : 0.001
+dropout : 0.0
+batch_by : none
+batch_mode : random
+batch_size : 1024
+epochs : 30
+eval_freq : 2000
+top_k : [3, 5, 10, 20]
+best_k : 3
+factor_num : 32
+mlp_layers : [256, 128, 64]
+num_ng : 1
+out : True
+gpu : 0
+best_k_ind : 0
+model_path : models/movielens/loss/random/none/NeuMF_2-1@3.pth
+Data Loaded
+Users: 6040, Items: 3706
+Number of Interactions: 800193
+Test Users: 6024
+NeuMF(
+  (embed_user_GMF): Embedding(6040, 32)
+  (embed_item_GMF): Embedding(3706, 32)
+  (embed_user_MLP): Embedding(6040, 128)
+  (embed_item_MLP): Embedding(3706, 128)
+  (MLP_layers): Sequential(
+    (0): Dropout(p=0.0, inplace=False)
+    (1): Linear(in_features=256, out_features=128, bias=True)
+    (2): ReLU()
+    (3): Dropout(p=0.0, inplace=False)
+    (4): Linear(in_features=128, out_features=64, bias=True)
+    (5): ReLU()
+    (6): Linear(in_features=64, out_features=32, bias=True)
+  )
+  (predict_layer): Linear(in_features=64, out_features=1, bias=True)
+)
+Epoch[001/030], Train Loss: 0.4696
+Epoch[001/030], Eval Loss: 83.4954
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.1662  0.0414  0.1759  0.2699
+@5      0.1517  0.0626  0.1678  0.2926
+@10     0.1246  0.0998  0.1584  0.3083
+@20     0.1010  0.1556  0.1615  0.3163
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[002/030], Train Loss: 0.3979
+Train Dataset State
+Flips 0 to 1: 0
+Flips 1 to 0: 85391
+train_pos: 714802, train_neg: 85391
+true_pos: 608473, true_neg: 24396, false_pos: 106329, false_neg: 60995
+Valid Dataset State
+Flips 0 to 1: 0
+Flips 1 to 0: 11208
+train_pos: 88792, train_neg: 11208
+true_pos: 75300, true_neg: 3131, false_pos: 13492, false_neg: 8077
+Epoch[002/030], Eval Loss: 76.9071
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2005  0.0537  0.2124  0.3183
+@5      0.1782  0.0772  0.2002  0.3388
+@10     0.1476  0.1222  0.1910  0.3556
+@20     0.1186  0.1886  0.1957  0.3638
+################### TEST END ######################
+
+Epoch[003/030], Train Loss: 0.2884
+Epoch[003/030], Eval Loss: 57.1803
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2071  0.0589  0.2183  0.3294
+@5      0.1854  0.0844  0.2073  0.3523
+@10     0.1553  0.1361  0.2017  0.3703
+@20     0.1265  0.2128  0.2111  0.3784
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[004/030], Train Loss: 0.2726
+Train Dataset State
+Flips 0 to 1: 5040
+Flips 1 to 0: 93061
+train_pos: 626781, train_neg: 173412
+true_pos: 541334, true_neg: 45278, false_pos: 85447, false_neg: 128134
+Valid Dataset State
+Flips 0 to 1: 336
+Flips 1 to 0: 12188
+train_pos: 76940, train_neg: 23060
+true_pos: 66395, true_neg: 6078, false_pos: 10545, false_neg: 16982
+Epoch[004/030], Eval Loss: 56.0941
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2211  0.0644  0.2320  0.3465
+@5      0.1976  0.0928  0.2208  0.3695
+@10     0.1653  0.1479  0.2152  0.3873
+@20     0.1326  0.2258  0.2237  0.3948
+################### TEST END ######################
+
+Epoch[005/030], Train Loss: 0.2148
+Epoch[005/030], Eval Loss: 41.9947
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2108  0.0645  0.2212  0.3341
+@5      0.1924  0.0946  0.2142  0.3602
+@10     0.1627  0.1518  0.2125  0.3784
+@20     0.1341  0.2372  0.2264  0.3868
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[006/030], Train Loss: 0.2006
+Train Dataset State
+Flips 0 to 1: 14092
+Flips 1 to 0: 79830
+train_pos: 561043, train_neg: 239150
+true_pos: 489236, true_neg: 58918, false_pos: 71807, false_neg: 180232
+Valid Dataset State
+Flips 0 to 1: 993
+Flips 1 to 0: 11688
+train_pos: 66245, train_neg: 33755
+true_pos: 57836, true_neg: 8214, false_pos: 8409, false_neg: 25541
+Epoch[006/030], Eval Loss: 41.9287
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.1887  0.0584  0.1970  0.3014
+@5      0.1756  0.0899  0.1943  0.3293
+@10     0.1519  0.1472  0.1968  0.3504
+@20     0.1289  0.2352  0.2151  0.3593
+################### TEST END ######################
+
+Epoch[007/030], Train Loss: 0.1808
+Epoch[007/030], Eval Loss: 34.4175
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2072  0.0643  0.2169  0.3279
+@5      0.1892  0.0942  0.2104  0.3539
+@10     0.1663  0.1569  0.2142  0.3748
+@20     0.1383  0.2471  0.2303  0.3829
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[008/030], Train Loss: 0.1700
+Train Dataset State
+Flips 0 to 1: 28528
+Flips 1 to 0: 71488
+train_pos: 518083, train_neg: 282110
+true_pos: 454385, true_neg: 67027, false_pos: 63698, false_neg: 215083
+Valid Dataset State
+Flips 0 to 1: 3070
+Flips 1 to 0: 9723
+train_pos: 59592, train_neg: 40408
+true_pos: 52478, true_neg: 9509, false_pos: 7114, false_neg: 30899
+Epoch[008/030], Eval Loss: 35.3245
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2077  0.0645  0.2167  0.3289
+@5      0.1922  0.0975  0.2129  0.3563
+@10     0.1672  0.1595  0.2156  0.3762
+@20     0.1390  0.2493  0.2317  0.3843
+################### TEST END ######################
+
+Epoch[009/030], Train Loss: 0.1668
+Epoch[009/030], Eval Loss: 31.5112
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2164  0.0673  0.2260  0.3394
+@5      0.2001  0.0990  0.2217  0.3658
+@10     0.1723  0.1623  0.2228  0.3845
+@20     0.1431  0.2561  0.2394  0.3931
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[010/030], Train Loss: 0.1550
+Train Dataset State
+Flips 0 to 1: 40536
+Flips 1 to 0: 70392
+train_pos: 488227, train_neg: 311966
+true_pos: 429916, true_neg: 72414, false_pos: 58311, false_neg: 239552
+Valid Dataset State
+Flips 0 to 1: 4330
+Flips 1 to 0: 9399
+train_pos: 54523, train_neg: 45477
+true_pos: 48199, true_neg: 10299, false_pos: 6324, false_neg: 35178
+Epoch[010/030], Eval Loss: 31.9769
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2176  0.0686  0.2283  0.3430
+@5      0.2000  0.1002  0.2228  0.3701
+@10     0.1740  0.1664  0.2261  0.3905
+@20     0.1436  0.2585  0.2420  0.3982
+################### TEST END ######################
+
+Epoch[011/030], Train Loss: 0.1581
+Epoch[011/030], Eval Loss: 29.2051
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2242  0.0697  0.2342  0.3498
+@5      0.2069  0.1035  0.2292  0.3762
+@10     0.1789  0.1698  0.2312  0.3957
+@20     0.1473  0.2638  0.2470  0.4036
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[012/030], Train Loss: 0.1452
+Train Dataset State
+Flips 0 to 1: 47200
+Flips 1 to 0: 71161
+train_pos: 464266, train_neg: 335927
+true_pos: 410046, true_neg: 76505, false_pos: 54220, false_neg: 259422
+Valid Dataset State
+Flips 0 to 1: 5855
+Flips 1 to 0: 8439
+train_pos: 51939, train_neg: 48061
+true_pos: 46085, true_neg: 10769, false_pos: 5854, false_neg: 37292
+Epoch[012/030], Eval Loss: 29.9513
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2168  0.0684  0.2244  0.3355
+@5      0.1999  0.1002  0.2200  0.3618
+@10     0.1738  0.1653  0.2233  0.3820
+@20     0.1440  0.2580  0.2396  0.3900
+################### TEST END ######################
+
+Epoch[013/030], Train Loss: 0.1499
+Epoch[013/030], Eval Loss: 27.6083
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2301  0.0719  0.2407  0.3583
+@5      0.2114  0.1053  0.2351  0.3846
+@10     0.1825  0.1722  0.2367  0.4045
+@20     0.1489  0.2665  0.2516  0.4119
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[014/030], Train Loss: 0.1362
+Train Dataset State
+Flips 0 to 1: 50506
+Flips 1 to 0: 71415
+train_pos: 443357, train_neg: 356836
+true_pos: 392734, true_neg: 80102, false_pos: 50623, false_neg: 276734
+Valid Dataset State
+Flips 0 to 1: 5239
+Flips 1 to 0: 9755
+train_pos: 47423, train_neg: 52577
+true_pos: 42350, true_neg: 11550, false_pos: 5073, false_neg: 41027
+Epoch[014/030], Eval Loss: 29.0250
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2315  0.0722  0.2423  0.3601
+@5      0.2134  0.1058  0.2368  0.3860
+@10     0.1833  0.1738  0.2380  0.4062
+@20     0.1491  0.2676  0.2525  0.4136
+################### TEST END ######################
+
+Epoch[015/030], Train Loss: 0.1437
+Epoch[015/030], Eval Loss: 25.7607
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2397  0.0747  0.2501  0.3707
+@5      0.2190  0.1100  0.2438  0.3970
+@10     0.1867  0.1765  0.2433  0.4157
+@20     0.1504  0.2690  0.2563  0.4227
+################### TEST END ######################
+
+#################### Flipping Epoch ##########################
+Epoch[016/030], Train Loss: 0.1296
+Train Dataset State
+Flips 0 to 1: 53986
+Flips 1 to 0: 71302
+train_pos: 426041, train_neg: 374152
+true_pos: 378191, true_neg: 82875, false_pos: 47850, false_neg: 291277
+Valid Dataset State
+Flips 0 to 1: 6510
+Flips 1 to 0: 8479
+train_pos: 45454, train_neg: 54546
+true_pos: 40535, true_neg: 11704, false_pos: 4919, false_neg: 42842
+Epoch[016/030], Eval Loss: 27.1539
+################### TEST ######################
+     precision  recall    NDCG     MRR
+@3      0.2212  0.0667  0.2304  0.3432
+@5      0.2041  0.1009  0.2256  0.3706
+@10     0.1778  0.1685  0.2283  0.3910
+@20     0.1466  0.2634  0.2444  0.3989
+################### TEST END ######################
+

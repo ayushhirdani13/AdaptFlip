@@ -260,9 +260,9 @@ if __name__ == "__main__":
 
     DATASET = args.dataset
     DATAPATH = f"../data/{DATASET}"
-    MODEL_DIR = f"models/{DATASET}"
-    RESULT_DIR = f"results/{DATASET}"
-    OUTPUT_SAVE_DIR = f"outputs/{DATASET}"
+    MODEL_DIR = f"models/{DATASET}/grad"
+    RESULT_DIR = f"results/{DATASET}/grad"
+    OUTPUT_SAVE_DIR = f"outputs/{DATASET}/grad"
     RESULT_DIR += f'/{args.batch_mode}/{args.batch_by}'
     MODEL_DIR += f'/{args.batch_mode}/{args.batch_by}'
     OUTPUT_SAVE_DIR += f'/{args.batch_mode}/{args.batch_by}/{args.model}_{args.W}-{args.alpha}@{args.best_k}'
