@@ -15,12 +15,13 @@ from loss import truncated_loss
 import evaluate
 
 def parse_args():
+    datasets = os.listdir("../data")
     parser = argparse.ArgumentParser(description="Run T_CE & Normal NeuMF")
     parser.add_argument("--dataset",
         type=str,
-        help="dataset used for training, options: movielens, default: movielens",
+        help=f"dataset used for training, options: {datasets}, default: movielens",
         default="movielens",
-        choices=['movielens'])
+        choices=datasets)
     parser.add_argument("--model",
         type=str,
         help="model used for training. options: GMF, NeuMF, default: NeuMF",
@@ -105,6 +106,9 @@ def parse_args():
     else:
         args.out = True
 
+    assert args.best_k in args.top_k, "best_k should be in top_k"
+    args.best_k_ind = args.top_k.index(args.best_k)
+
     return args
 
 def drop_rate_schedule(iteration):
@@ -188,9 +192,6 @@ def worker_init_fn(worker_id):
 
 if __name__ == "__main__":
     args = parse_args()
-
-    assert args.best_k in args.top_k, "best_k should be in top_k"
-    args.best_k_ind = args.top_k.index(args.best_k)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     torch.backends.cudnn.benchmark = True

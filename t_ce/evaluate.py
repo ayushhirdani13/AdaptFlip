@@ -70,3 +70,22 @@ def test_all_users(model, item_num, test_data_pos, user_pos, top_k, device='cuda
         GroundTruth.append(test_data_pos[u])
     precision, recall, NDCG, MRR = compute_acc(GroundTruth, predictedIndices, top_k)
     return precision, recall, NDCG, MRR
+
+def test_all_users_cdae(model, item_num, test_data_pos, user_pos, top_k, observed_mat, device='cuda'):
+    predictedIndices = []
+    GroundTruth = []
+    for u in test_data_pos:
+        user = torch.tensor(u, dtype=torch.long, device=device)
+        item_vec = torch.tensor(observed_mat.getrow(u).toarray()[0], device=device, dtype=torch.float32)
+
+        predictions = model(user, item_vec)
+        test_data_mask = torch.zeros(item_num, device=device)
+        if u in user_pos:
+            test_data_mask[user_pos[u]] = -9999
+        predictions = predictions + test_data_mask
+        _, indices = torch.topk(predictions, top_k[-1])
+        indices = indices.cpu().numpy().tolist()
+        predictedIndices.append(indices)
+        GroundTruth.append(test_data_pos[u])
+    precision, recall, NDCG, MRR = compute_acc(GroundTruth, predictedIndices, top_k)
+    return precision, recall, NDCG, MRR

@@ -40,7 +40,7 @@ def load_data(dataset, datapath):
 
     # Create user-item matrix
     user_num = train_data["user"].max() + 1
-    item_num = train_data["item"].max() + 1
+    item_num = max(train_data["item"].max() + 1, valid_data["item"].max() + 1)
     rows = train_data_list[:, 0]
     cols = train_data_list[:, 1]
     train_mat = sp.csr_matrix((np.ones_like(rows), (rows, cols)), shape=(user_num, item_num)).todok()
@@ -58,12 +58,14 @@ def load_data(dataset, datapath):
         for line in f.readlines():
             user, item, _ = line.strip().split('\t')
             user, item = int(user), int(item)
+            item_num = max(item_num, item + 1)
             test_data_pos[user].append(item)
 
     test_file = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['test_all']}")
     if not os.path.exists(test_file):
         raise FileNotFoundError(f"Test file '{test_file}' does not exist")
     test_df = pd.read_csv(test_file, sep="\t", header=None, names=COLUMN_NAMES, dtype=COLUMN_DTYPES)
+    item_num = max(item_num, test_df["item"].max() + 1)
 
     return (
         user_num,
@@ -240,3 +242,82 @@ class NCF_NeighborWise_Dataset(NCF_Dataset):
         true_labels = true_labels[cluster_mask]
 
         return user, item, labels, true_labels
+    
+def load_data_cdae(dataset, datapath):
+    # Check if datapath exists
+    if not os.path.exists(datapath):
+        raise FileNotFoundError(f"Datapath '{datapath}' does not exist")
+
+    # Load training data
+    train_file = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['train']}")
+    if not os.path.exists(train_file):
+        raise FileNotFoundError(f"Train file '{train_file}' does not exist")
+    train_data = pd.read_csv(train_file, sep="\t", header=None, names=COLUMN_NAMES, dtype=COLUMN_DTYPES)
+
+    valid_file  = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['valid']}")
+    if not os.path.exists(valid_file):
+        raise FileNotFoundError(f"Valid file '{valid_file}' does not exist")
+    valid_data = pd.read_csv(valid_file, sep="\t", header=None, names=COLUMN_NAMES, dtype=COLUMN_DTYPES)
+
+    user_num = train_data["user"].max() + 1
+    item_num = max(train_data["item"].max() + 1, valid_data["item"].max() + 1)
+
+    test_file = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['test']}")
+    if not os.path.exists(test_file):
+        raise FileNotFoundError(f"Test file '{test_file}' does not exist")
+    test_data_pos = defaultdict(list)
+    with open(test_file, "r") as f:
+        for line in f.readlines():
+            user, item, _ = line.strip().split('\t')
+            user, item = int(user), int(item)
+            item_num = max(item_num, item + 1)
+            test_data_pos[user].append(item)
+
+    test_file = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['test_all']}")
+    if not os.path.exists(test_file):
+        raise FileNotFoundError(f"Test file '{test_file}' does not exist")
+    test_df = pd.read_csv(test_file, sep="\t", header=None, names=COLUMN_NAMES, dtype=COLUMN_DTYPES)
+    item_num = max(item_num, test_df["item"].max() + 1)
+
+    train_mat = sp.csr_matrix((np.ones_like(train_data["user"]), (train_data["user"], train_data["item"])), shape=(user_num, item_num), dtype=np.int32)
+    valid_mat = sp.csr_matrix((np.ones_like(valid_data["user"]), (valid_data["user"], valid_data["item"])), shape=(user_num, item_num), dtype=np.int32)
+    observed_df = pd.concat([train_data, valid_data])
+    observed_mat = sp.csr_matrix((np.ones_like(observed_df["user"]), (observed_df["user"], observed_df["item"])), shape=(user_num, item_num), dtype=np.int32)
+
+    train_data_true = sp.csr_matrix((train_data['true_label'], (train_data["user"], train_data["item"])), shape=(user_num, item_num), dtype=np.int32)
+    valid_data_true = sp.csr_matrix((valid_data['true_label'], (valid_data["user"], valid_data["item"])), shape=(user_num, item_num), dtype=np.int32)
+
+    train_data_list = train_data[["user", "item"]].values
+    valid_data_list = valid_data[["user", "item"]].values
+
+    user_pos = defaultdict(list)
+    for user, item in np.concatenate((train_data_list, valid_data_list)):
+        user_pos[user].append(item)
+
+    return (
+        user_num,
+        item_num,
+        train_mat,
+        train_data_true,
+        valid_mat,
+        valid_data_true,
+        observed_mat,
+        user_pos,
+        test_data_pos,
+    )
+
+class CDAE_Data(Dataset):
+    def __init__(self, train_mat, user_num, item_num, true_label):
+        super(CDAE_Data, self).__init__()
+        self.train_mat = train_mat
+        self.user_num = user_num
+        self.item_num = item_num
+        self.true_label = true_label
+
+    def __len__(self):
+        return self.train_mat.shape[0]
+
+    def __getitem__(self, idx):
+        item_vec = self.train_mat.getrow(idx).toarray()[0]
+        true_label_vec = self.true_label.getrow(idx).toarray()[0]
+        return idx, item_vec, true_label_vec

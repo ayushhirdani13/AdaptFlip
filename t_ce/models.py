@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class GMF(nn.Module):
     def __init__(self, user_num, item_num, factor_num, *args, **kwargs):
@@ -81,3 +82,28 @@ class NeuMF(nn.Module):
 
         prediction = self.predict_layer(concat)
         return prediction.view(-1)
+
+class CDAE(nn.Module):
+    def __init__(self, user_num, item_num, factor_num, corruption_ratio, *args, **kwargs):
+        super(CDAE, self).__init__(*args, **kwargs)
+
+        self.user_num = user_num
+        self.item_num = item_num
+        self.factor_num = factor_num
+        self.corruption_ratio = corruption_ratio
+
+        self.user_embedding = nn.Embedding(user_num, factor_num)
+        self.encoder = nn.Linear(item_num, factor_num)
+        self.decoder = nn.Linear(factor_num, item_num)
+
+        self.__init_weights__()
+
+    def __init_weights__(self):
+        nn.init.normal_(self.user_embedding.weight, std=0.01)
+        nn.init.xavier_uniform_(self.encoder.weight)
+        nn.init.kaiming_uniform_(self.decoder.weight, a=1, nonlinearity='sigmoid')
+    
+    def forward(self, user, item_vec):
+        item_vec = F.dropout(item_vec, p=self.corruption_ratio, training=self.training)
+        encoder = self.encoder(item_vec) + self.user_embedding(user)
+        return self.decoder(encoder)
