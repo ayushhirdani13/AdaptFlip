@@ -16,12 +16,13 @@ import models
 import evaluate
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run T_CE & Normal NeuMF")
+    datasets = os.listdir("../data")
+    parser = argparse.ArgumentParser(description="Run NCF, Flip based on Avg Loss")
     parser.add_argument("--dataset",
         type=str,
-        help="dataset used for training, options: movielens, default: movielens",
+        help=f"dataset used for training, options: {datasets}, default: movielens",
         default="movielens",
-        choices=["movielens"])
+        choices=datasets)
     parser.add_argument("--model",
         type=str,
         help="model used for training. options: GMF, NeuMF, default: NeuMF",

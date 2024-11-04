@@ -40,7 +40,7 @@ def load_data(dataset, datapath):
 
     # Create user-item matrix
     user_num = train_data["user"].max() + 1
-    item_num = train_data["item"].max() + 1
+    item_num = max(train_data["item"].max() + 1, valid_data["item"].max() + 1)
     rows = train_data_list[:, 0]
     cols = train_data_list[:, 1]
     train_mat = sp.csr_matrix((np.ones_like(rows), (rows, cols)), shape=(user_num, item_num)).todok()
@@ -58,12 +58,14 @@ def load_data(dataset, datapath):
         for line in f.readlines():
             user, item, _ = line.strip().split('\t')
             user, item = int(user), int(item)
+            item_num = max(item_num, item + 1)
             test_data_pos[user].append(item)
 
     test_file = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['test_all']}")
     if not os.path.exists(test_file):
         raise FileNotFoundError(f"Test file '{test_file}' does not exist")
     test_df = pd.read_csv(test_file, sep="\t", header=None, names=COLUMN_NAMES, dtype=COLUMN_DTYPES)
+    item_num = max(item_num, test_df["item"].max() + 1)
 
     return (
         user_num,
