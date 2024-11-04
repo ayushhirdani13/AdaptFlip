@@ -42,10 +42,6 @@ def parse_args():
         type=float,
         default=0.001,
         help="learning rate, default: 0.001",)
-    parser.add_argument("--dropout",
-        type=float,
-        default=0.0,
-        help="dropout rate, default: 0.0",)
     parser.add_argument("--batch_size",
         type=int,
         default=32,

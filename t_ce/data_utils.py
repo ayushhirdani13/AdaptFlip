@@ -94,12 +94,12 @@ class NCF_Dataset(Dataset):
         self.item_num = item_num
 
     def ng_sample(self):
+        assert self.is_training != 2, "Sampling only for training mode"
         if self.num_ng == 0:
             self.features_fill = self.features
             self.labels_fill = self.labels
             self.true_labels_fill = self.true_labels
         else:
-            assert self.is_training != 2, "Sampling only for training mode"
             self.negative_samples = []
             for _ in range(self.num_ng):
                 for u, _ in self.features:
