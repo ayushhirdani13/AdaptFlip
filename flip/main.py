@@ -105,13 +105,6 @@ def parse_args():
 
     return args
 
-def drop_rate_schedule(iteration):
-	drop_rate = np.linspace(0, args.drop_rate**args.exponent, args.num_gradual)
-	if iteration < args.num_gradual:
-		return drop_rate[iteration]
-	else:
-		return args.drop_rate
-
 def get_results_dict(results, top_k):
     results_dict = {}
     for i, k in enumerate(top_k):
@@ -182,7 +175,7 @@ def evalModel(model, valid_loader, epoch, valid_log, valid_log_buffer, device='c
             loss_val = loss_all_cpu[ind]
             valid_label = int(train_label_cpu[ind])
             valid_log_buffer.append([u, i, epoch, f"{loss_val:.4f}", valid_label])
-            valid_log[(u, i)].append(loss_val)
+            valid_log[(u, i)] += loss_val
         if (epoch+1) % args.W == 0:
             flip_inds = flipper(user_cpu[pos_mask], item_cpu[pos_mask], idx_cpu[pos_mask], valid_log, args.W)
             flip_inds_buffer.update(flip_inds)
@@ -197,10 +190,7 @@ def evalModel(model, valid_loader, epoch, valid_log, valid_log_buffer, device='c
 
 def flipper(user, item, idx, loss_log, W):
     user_item_pairs = np.column_stack((user, item))
-    avg_losses = np.array([np.mean(loss_log[tuple(pair)][-W:]) for pair in user_item_pairs])
-    for pair in user_item_pairs:
-        if len(loss_log[tuple(pair)]) == 0:
-            print(pair)
+    avg_losses = np.array([(loss_log[tuple(pair)] / W) for pair in user_item_pairs])
 
     # Calculate thresholds using IQR (Interquartile Range)
     avg_Q1, avg_Q3 = np.quantile(avg_losses, [0.25, 0.75])
@@ -332,8 +322,8 @@ if __name__ == "__main__":
     test_results = []
     start_time = time()
 
-    train_log = defaultdict(list)
-    valid_log = defaultdict(list)
+    train_log = defaultdict(float)
+    valid_log = defaultdict(float)
 
     train_log_buffer = []
     valid_log_buffer = []
@@ -400,7 +390,7 @@ if __name__ == "__main__":
                 loss_val = loss_all_cpu[ind]
                 train_label = int(train_label_cpu[ind])
                 train_log_buffer.append([u, i, epoch, f"{loss_val:.4f}", train_label])
-                train_log[(u, i)].append(loss_val)
+                train_log[(u, i)] += loss_val
             if (epoch+1) % args.W == 0:
                 flip_inds = flipper(user_cpu[pos_mask], item_cpu[pos_mask], idx_cpu[pos_mask], train_log, args.W)
                 flip_inds_buffer.update(flip_inds)
@@ -444,6 +434,10 @@ if __name__ == "__main__":
                     df = pd.DataFrame(valid_log_buffer, columns=NAMES)
                     df.to_csv(f, mode='a',index=False, header=False)
 
+        training_losses_buffer.clear()
+        valid_log_buffer.clear()
+        train_log_buffer.clear()
+
         if curr_recall > best_recall:
             best_recall = curr_recall
             best_recall_idx = epoch
@@ -473,4 +467,4 @@ if __name__ == "__main__":
 
     results_df = pd.DataFrame(test_results).round(4)
     if args.out == True:
-        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.drop_rate}_{args.num_gradual}@{args.best_k}.csv"), index=False, float_format="%.4f")
+        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.W}_{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")

@@ -28,18 +28,14 @@ def parse_args():
         help="model used for training. options: GMF, NeuMF, default: NeuMF",
         default="NeuMF",
         choices=['GMF', 'NeuMF'])
-    parser.add_argument("--drop_rate",
-        type=float,
-        help="drop rate, default: 0.2",
-        default=0.2)
-    parser.add_argument("--num_gradual",
+    parser.add_argument("--W",
         type=int,
-        default=30000,
-        help="how many epochs to linearly increase drop_rate, default: 30000",)
-    parser.add_argument("--exponent",
-        type=float,
+        help="Window size, default: 2",
+        default=2)
+    parser.add_argument("--alpha",
+        type=int,
         default=1,
-        help="exponent of the drop rate {0.5, 1, 2}, default: 1",)
+        help="alpha in Q3 + alpha * IQR, default: 1",)
     parser.add_argument("--lr",
         type=float,
         default=0.001,
@@ -108,13 +104,6 @@ def parse_args():
 
     return args
 
-def drop_rate_schedule(iteration):
-	drop_rate = np.linspace(0, args.drop_rate**args.exponent, args.num_gradual)
-	if iteration < args.num_gradual:
-		return drop_rate[iteration]
-	else:
-		return args.drop_rate
-
 def get_results_dict(results, top_k):
     results_dict = {}
     for i, k in enumerate(top_k):
@@ -150,11 +139,10 @@ def test(model, test_data_pos, user_pos):
 
 ########################### Eval #####################################
 @torch.no_grad()
-def evalModel(model, valid_loader, epoch, valid_log, valid_log_buffer, device='cuda'):
+def evalModel(model, valid_loader, device='cuda'):
     model.eval()
     epoch_loss = 0
     valid_loader.dataset.ng_sample()
-    flip_inds_buffer = set()
     for user, item, label, train_label, _, idx in valid_loader:
         user = user.to(device)
         item = item.to(device)
@@ -162,56 +150,22 @@ def evalModel(model, valid_loader, epoch, valid_log, valid_log_buffer, device='c
         # label = label.float().to(device)
 
         prediction = model(user, item)
-        loss_all = F.binary_cross_entropy_with_logits(prediction, train_label, reduction='none')
-        loss = torch.mean(loss_all)
+        loss = F.binary_cross_entropy_with_logits(prediction, train_label)
         epoch_loss += loss.item()
-
-        # Convert tensors to CPU and NumPy arrays for logging
-        user_cpu = user.cpu().numpy()
-        item_cpu = item.cpu().numpy()
-        train_label_cpu = train_label.cpu().numpy()
-        loss_all_cpu = loss_all.cpu().detach().numpy()
-        idx_cpu = idx.cpu().numpy()
-        label_cpu = label.cpu().numpy()
-        pos_mask = label_cpu == 1
-
-        pos_indices = np.where(pos_mask)[0]
-
-        for ind in pos_indices:
-            u = user_cpu[ind]
-            i = item_cpu[ind]
-
-            # Update valid_log in batch
-            loss_val = loss_all_cpu[ind]
-            valid_label = int(train_label_cpu[ind])
-            valid_log_buffer.append([u, i, epoch, f"{loss_val:.4f}", valid_label])
-            valid_log[(u, i)].append(loss_val)
-        if (epoch+1) % args.W == 0:
-            flip_inds = flipper(user_cpu[pos_mask], item_cpu[pos_mask], idx_cpu[pos_mask], valid_log, args.W)
-            flip_inds_buffer.update(flip_inds)
-
-    if (epoch+1) % args.W == 0:
-        print("Valid Dataset State")
-        valid_loader.dataset.flip_labels(list(flip_inds_buffer))
-        flip_inds_buffer.clear()
-        if args.out == True:
-            valid_loader.dataset.save_state(epoch=epoch, mode='valid', SAVE_DIR=OUTPUT_SAVE_DIR)
+        
     return epoch_loss
 
-def flipper(user, item, idx, loss_log, W):
+def flipper(user, item, idx, grad_log, W):
     user_item_pairs = np.column_stack((user, item))
-    avg_grads = np.array([np.mean(loss_log[tuple(pair)][-W:]) for pair in user_item_pairs])
-    for pair in user_item_pairs:
-        if len(loss_log[tuple(pair)]) == 0:
-            print(pair)
+    avg_grads = np.array([(grad_log[tuple(pair)] / W) for pair in user_item_pairs])
 
     # Calculate thresholds using IQR (Interquartile Range)
-    avg_Q1, avg_Q3 = np.quantile(avg_grads, [0.25, 0.75])
-    avg_IQR = avg_Q3 - avg_Q1
-    avg_upper = avg_Q3 + args.alpha * avg_IQR
+    Q1, Q3 = np.quantile(avg_grads, [0.25, 0.75])
+    IQR = Q3 - Q1
+    threshold = Q3 + args.alpha * IQR
 
     # Determine indices where average loss exceeds the threshold
-    flip_inds = idx[avg_grads > avg_upper].tolist()
+    flip_inds = idx[avg_grads > threshold].tolist()
 
     return flip_inds
 
@@ -335,8 +289,7 @@ if __name__ == "__main__":
     test_results = []
     start_time = time()
 
-    train_log = defaultdict(list)
-    valid_log = defaultdict(list)
+    train_log = defaultdict(float)
 
     train_log_buffer = []
     valid_log_buffer = []
@@ -392,24 +345,22 @@ if __name__ == "__main__":
 
             
             for ind in pos_indices:
+                optimizer.zero_grad()
                 u = user_cpu[ind]
                 i = item_cpu[ind]
 
                 # Update train_log in batch
-                grad_val = torch.autograd.grad(loss_all[ind], model.predict_layer.weight, retain_graph=True)[0].mean().item()
+                grad_val = torch.autograd.grad(loss_all[ind], model.predict_layer.weight, retain_graph=True, create_graph=False)[0].mean().item()
                 loss_val = loss_all_cpu[ind]
                 train_label = int(train_label_cpu[ind])
                 train_log_buffer.append([u, i, epoch, f"{loss_val:.4f}", f"{grad_val}",train_label])
-                train_log[(u, i)].append(grad_val)
+                train_log[(u, i)] += grad_val
             
             torch.cuda.empty_cache()
             
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-            if (count % 100) == 0:
-                print(f"{count} batches done, {time() - start_time:.2f} seconds elapsed")
 
             if (epoch+1) % args.W == 0:
                 flip_inds = flipper(user_cpu[pos_mask], item_cpu[pos_mask], idx_cpu[pos_mask], train_log, args.W)
@@ -425,11 +376,10 @@ if __name__ == "__main__":
             train_loader.dataset.flip_labels(list(flip_inds_buffer))
             flip_inds_buffer.clear()
             train_log.clear()
-            valid_log.clear()
             if args.out == True:
                 train_loader.dataset.save_state(epoch=epoch, mode='train', SAVE_DIR=OUTPUT_SAVE_DIR)
 
-        eval_loss = evalModel(model, valid_loader, epoch, valid_log, valid_log_buffer, device=device)
+        eval_loss = evalModel(model, valid_loader, device=device)
         print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Eval Loss: {eval_loss:.4f}")
         curr_recall, curr_test_results = test(model, test_data_pos, user_pos)
         curr_test_results["Validation Loss"] = eval_loss
@@ -453,6 +403,10 @@ if __name__ == "__main__":
                     NAMES = ["user", "item", "epoch", "loss", "train_label"]
                     df = pd.DataFrame(valid_log_buffer, columns=NAMES)
                     df.to_csv(f, mode='a',index=False, header=False)
+
+        training_losses_buffer.clear()
+        train_log_buffer.clear()
+        valid_log_buffer.clear()
 
         if curr_recall > best_recall:
             best_recall = curr_recall
@@ -483,4 +437,4 @@ if __name__ == "__main__":
 
     results_df = pd.DataFrame(test_results).round(4)
     if args.out == True:
-        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.drop_rate}_{args.num_gradual}@{args.best_k}.csv"), index=False, float_format="%.4f")
+        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.W}_{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")
