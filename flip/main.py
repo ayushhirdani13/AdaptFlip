@@ -33,7 +33,7 @@ def parse_args():
         help="Window size, default: 2",
         default=2)
     parser.add_argument("--alpha",
-        type=int,
+        type=float,
         default=1,
         help="alpha in Q3 + alpha * IQR, default: 1",)
     parser.add_argument("--lr",

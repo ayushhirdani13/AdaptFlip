@@ -364,6 +364,7 @@ class CDAE_Data(Dataset):
     def __init__(self, train_mat, user_num, item_num, true_label):
         super(CDAE_Data, self).__init__()
         self.train_mat = train_mat
+        self.label_mat = train_mat.copy()
         self.user_num = user_num
         self.item_num = item_num
         self.true_label = true_label
@@ -373,5 +374,9 @@ class CDAE_Data(Dataset):
 
     def __getitem__(self, idx):
         item_vec = self.train_mat.getrow(idx).toarray()[0]
+        label_vec = self.label_mat.getrow(idx).toarray()[0]
         true_label_vec = self.true_label.getrow(idx).toarray()[0]
-        return idx, item_vec, true_label_vec
+        return idx, item_vec, label_vec, true_label_vec
+    
+    def flip_labels(self):
+        pass
