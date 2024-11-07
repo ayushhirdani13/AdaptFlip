@@ -378,5 +378,44 @@ class CDAE_Data(Dataset):
         true_label_vec = self.true_label.getrow(idx).toarray()[0]
         return idx, item_vec, label_vec, true_label_vec
     
-    def flip_labels(self):
-        pass
+    def flip_labels(self, flip_inds):
+        flip0_1 = (self.train_mat[flip_inds[:, 0], flip_inds[:, 1]] == 0).sum()
+        flip1_0 = (self.train_mat[flip_inds[:, 0], flip_inds[:, 1]] == 1).sum()
+        
+        self.train_mat[flip_inds[:, 0], flip_inds[:, 1]] = 1 - self.train_mat[flip_inds[:, 0], flip_inds[:, 1]]
+
+        print(f"Flips 0 to 1: {flip0_1}")
+        print(f"Flips 1 to 0: {flip1_0}")
+
+        self.get_state()
+    
+    def get_state(self):
+        pos_int_mask = self.label_mat == 1
+        train_labels = self.train_mat[pos_int_mask][0]
+        true_labels = self.true_label[pos_int_mask][0]
+
+        train_pos_mask = train_labels == 1
+        train_neg_mask = train_labels == 0
+        true_pos_mask = true_labels == 1
+        true_neg_mask = true_labels == 0
+
+        pos_train = np.sum(train_pos_mask)
+        neg_train = np.sum(train_neg_mask)
+        print(f"train_pos: {pos_train}, train_neg: {neg_train}")
+
+        true_pos = np.sum(train_pos_mask & true_pos_mask)
+        true_neg = np.sum(train_neg_mask & true_neg_mask)
+        false_pos = np.sum(train_pos_mask & true_neg_mask)
+        false_neg = np.sum(train_neg_mask & true_pos_mask)
+        print(f"true_pos: {true_pos}, true_neg: {true_neg}, false_pos: {false_pos}, false_neg: {false_neg}")
+
+    def save_state(self, epoch=0, mode='train', SAVE_DIR=""):
+        if SAVE_DIR:
+            os.makedirs(SAVE_DIR, exist_ok=True)
+            SAVE_PATH = os.path.join(SAVE_DIR, f"{mode}_{epoch}.csv")
+        else:
+            SAVE_PATH = f"{mode}_{epoch}.csv"
+        
+        user, item = self.label_mat.nonzero()
+        train_label = self.train_mat[user, item].getA1()
+        pd.DataFrame({"user": user, "item": item, "train_label": train_label}).to_csv(SAVE_PATH, index=False, header=False, sep="\t")

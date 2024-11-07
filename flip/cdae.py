@@ -2,21 +2,22 @@ import os
 from time import time
 import random
 import argparse
+from collections import defaultdict
 
 import pandas as pd
 import numpy as np
 
 import torch
-import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
 
 import models
 import data_utils
 import evaluate
-from loss import truncated_loss_cdae
 
 def parse_args():
     datasets = os.listdir("../data")
-    parser = argparse.ArgumentParser(description="Run CDAE, Normal and T-CE")
+    parser = argparse.ArgumentParser(description="Run CDAE, Flip")
     parser.add_argument("--dataset",
         type=str,
         help=f"dataset used for training, options: {datasets}, default: movielens",
@@ -26,22 +27,22 @@ def parse_args():
         type=float,
         default=0.2,
         help="corruption ratio, default: 0.2")
-    parser.add_argument("--drop_rate",
-        type=float,
-        help="drop rate, default: 0.2",
-        default=0.2)
-    parser.add_argument("--num_gradual",
+    parser.add_argument("--W",
         type=int,
-        default=30000,
-        help="how many epochs to linearly increase drop_rate, default: 30000",)
-    parser.add_argument("--exponent",
-        type=float,
+        help="Window size, default: 2",
+        default=2)
+    parser.add_argument("--alpha",
+        type=int,
         default=1,
-        help="exponent of the drop rate {0.5, 1, 2}, default: 1",)
+        help="alpha in Q3 + alpha * IQR, default: 1",)
     parser.add_argument("--lr",
         type=float,
         default=0.001,
         help="learning rate, default: 0.001",)
+    parser.add_argument("--dropout",
+        type=float,
+        default=0.0,
+        help="dropout rate, default: 0.0",)
     parser.add_argument("--batch_size",
         type=int,
         default=32,
@@ -89,14 +90,6 @@ def parse_args():
 
 def worker_init_fn(worker_id):
     np.random.seed(2024 + worker_id)
-
-
-def drop_rate_schedule(iteration):
-    drop_rate = np.linspace(0, args.drop_rate**args.exponent, args.num_gradual)
-    if iteration < args.num_gradual:
-        return drop_rate[iteration]
-    else:
-        return args.drop_rate
     
 def get_results_dict(results, top_k):
     results_dict = {}
@@ -133,17 +126,46 @@ def test(model, test_data_pos, user_pos, observed_mat):
 
 ########################### Eval #####################################
 @torch.no_grad()
-def evalModel(model, valid_loader, count, device='cpu'):
+def evalModel(model, valid_loader, epoch, valid_log, device='cpu'):
     model.eval()
     eval_loss = 0.0
-    for i, (user, item_mat, _) in enumerate(valid_loader):
+    flip_inds_buffer = np.empty((0,2), dtype=int)
+    for i, (user, item_mat, label_mat, _) in enumerate(valid_loader):
         user = user.to(device)
         item_mat = item_mat.float().to(device)
 
         prediction = model(user, item_mat)
-        loss = truncated_loss_cdae(prediction, item_mat, drop_rate_schedule(count))
+        loss_all = F.binary_cross_entropy_with_logits(prediction, item_mat, reduction='none')
+        loss = torch.mean(loss_all)
         eval_loss += loss.item()
+
+        pos_mask = label_mat > 0
+        pos_indices = torch.argwhere(pos_mask).cpu().numpy()
+        user_cpu = user.cpu().numpy()
+        for u_ind, it in pos_indices:
+            u = user_cpu[u_ind]
+            valid_log[(u, it)] += loss_all[u_ind, it].item()
+        if (epoch + 1) % args.W == 0:
+            flip_inds = flipper(user_cpu, pos_indices, valid_log, args.W)
+            flip_inds_buffer = np.concatenate((flip_inds_buffer, flip_inds), axis=0)
+
+    if (epoch + 1) % args.W == 0:
+        print("Valid Dataset State")
+        valid_loader.dataset.flip_labels(flip_inds_buffer)
+        valid_log.clear()
+        if args.out == True:
+            valid_loader.dataset.save_state(epoch=epoch, mode='valid', SAVE_DIR=OUTPUT_SAVE_DIR)
     return eval_loss
+
+def flipper(user, pos_indices, loss_log, W):
+    avg_losses = np.array([(loss_log[(user[u], i)] / W) for u, i in pos_indices])
+    Q1, Q3 = np.quantile(avg_losses, q=[0.25, 0.75])
+    IQR = Q3 - Q1
+    threshold = Q3 + args.alpha * IQR
+    threshold_mask = avg_losses > threshold
+    flip_inds = pos_indices[threshold_mask]
+    flip_inds[:,0] = user[flip_inds[:,0]]
+    return flip_inds
     
 if __name__ == '__main__':
     args = parse_args()
@@ -160,12 +182,15 @@ if __name__ == '__main__':
 
     DATASET = args.dataset
     DATAPATH = f"../data/{DATASET}"
-    MODEL_DIR = f"models/{DATASET}"
-    RESULT_DIR = f"results/{DATASET}"
+    MODEL_DIR = f"models/{DATASET}/loss"
+    RESULT_DIR = f"results/{DATASET}/loss"
+    OUTPUT_SAVE_DIR = f"outputs/{DATASET}/loss"
+    OUTPUT_SAVE_DIR += f'/CDAE_{args.W}-{args.alpha}@{args.best_k}'
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_SAVE_DIR, exist_ok=True)
 
-    MODEL_FILE = f"CDAE_{args.drop_rate}-{args.num_gradual}@{args.best_k}.pth"
+    MODEL_FILE = f"CDAE_{args.W}-{args.alpha}@{args.best_k}.pth"
     args.model_path = os.path.join(MODEL_DIR, MODEL_FILE)
 
     print("Configurations:")
@@ -207,24 +232,53 @@ if __name__ == '__main__':
     test_results = []
     start_time = time()
 
+    train_log = defaultdict(float)
+    valid_log = defaultdict(float)
+    flip_inds_buffer = np.empty((0,2), dtype=int)
+
     for epoch in range(args.epochs):
         model.train()
         epoch_loss = 0.0
-        for i, (user, item_mat, true_label) in enumerate(train_loader):
+
+        if (epoch+1) % args.W == 0:
+            print("#################### Flipping Epoch ##########################")
+
+        for i, (user, item_mat, label_mat, true_label) in enumerate(train_loader):
             user = user.to(device)
             item_mat = item_mat.float().to(device)
 
             prediction = model(user, item_mat)
-            loss = truncated_loss_cdae(prediction, item_mat, drop_rate_schedule(count))
+            loss_all = F.binary_cross_entropy_with_logits(prediction, item_mat, reduction='none')
+            loss = torch.mean(loss_all)
+
+            with torch.no_grad():    
+                pos_mask = label_mat > 0
+                pos_indices = torch.argwhere(pos_mask).cpu().numpy()
+                user_cpu = user.cpu().numpy()
+                for u_ind, it in pos_indices:
+                    u = user_cpu[u_ind]
+                    train_log[(u, it)] += loss_all[u_ind, it].item()
+                if (epoch + 1) % args.W == 0:
+                    flip_inds = flipper(user_cpu, pos_indices, train_log, args.W)
+                    flip_inds_buffer = np.concatenate((flip_inds_buffer, flip_inds), axis=0)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
         
+        if (epoch + 1) % args.W == 0:
+            print("Train Dataset State")
+            train_loader.dataset.flip_labels(flip_inds_buffer)
+            flip_inds_buffer = np.empty((0,2), dtype=int)
+            train_log.clear()
+            valid_log.clear()
+            if args.out == True:
+                train_loader.dataset.save_state(epoch=epoch, mode='train', SAVE_DIR=OUTPUT_SAVE_DIR)
+
         epoch_loss = epoch_loss / len(train_loader)
         print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Train Loss: {epoch_loss:.4f}")
 
-        eval_loss = evalModel(model, valid_loader, count, device)
+        eval_loss = evalModel(model, valid_loader, epoch, valid_log, device)
         print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Eval Loss: {eval_loss:.4f}")
         curr_recall, curr_test_results = test(model, test_data_pos, user_pos, observed_mat)
         curr_test_results["Validation Loss"] = eval_loss
@@ -257,4 +311,4 @@ if __name__ == '__main__':
 
     results_df = pd.DataFrame(test_results).round(4)
     if args.out == True:
-        results_df.to_csv(os.path.join(RESULT_DIR, f"CDAE_{args.drop_rate}-{args.num_gradual}@{args.best_k}.csv"), index=False, float_format="%.4f")
+        results_df.to_csv(os.path.join(RESULT_DIR, f"CDAE_{args.W}-{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")
