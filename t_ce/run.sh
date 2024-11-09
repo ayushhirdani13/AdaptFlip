@@ -12,7 +12,7 @@ batch_size=1024                      # batch size
 epochs=30                       # number of epochs for training
 eval_freq=2000                    # evaluation frequency
 top_k="3 5 10 20"                 # top-k metrics as a list of values
-best_k=3                          # best-k for saving model checkpoint
+best_k=10                          # best-k for saving model checkpoint
 factor_num=32                     # number of latent factors
 mlp_layers="256 128 64"                # MLP layer sizes
 num_ng=1                          # negative samples for training
@@ -20,7 +20,7 @@ out='True'                        # if save outputs
 gpu="0"                           # GPU ID
 
 mkdir -p logs/${dataset}/${batch_mode}/${batch_by};
-log_path=logs/${dataset}/${batch_mode}/${batch_by}/${model}_${drop_rate}-${num_gradual}@${best_k}.log;
+log_path=logs/${dataset}/${batch_mode}/${batch_by}/${model}_${drop_rate}_${num_gradual}_${batch_size}@${best_k}.log;
 echo "log_path=${log_path}";
 
 # Run the script with all parameters

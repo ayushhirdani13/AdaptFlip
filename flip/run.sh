@@ -19,7 +19,7 @@ out='True'                        # if save outputs
 gpu="0"                           # GPU ID
 
 mkdir -p logs/${dataset}/loss/${batch_mode}/${batch_by};
-log_path=logs/${dataset}/loss/${batch_mode}/${batch_by}/${model}_${W}-${alpha}@${best_k}.log;
+log_path=logs/${dataset}/loss/${batch_mode}/${batch_by}/${model}_${W}_${alpha}_${batch_size}@${best_k}.log;
 echo "log_path=${log_path}";
 
 # Run the script with all parameters

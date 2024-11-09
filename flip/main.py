@@ -253,12 +253,12 @@ if __name__ == "__main__":
     OUTPUT_SAVE_DIR = f"outputs/{DATASET}/loss"
     RESULT_DIR += f'/{args.batch_mode}/{args.batch_by}'
     MODEL_DIR += f'/{args.batch_mode}/{args.batch_by}'
-    OUTPUT_SAVE_DIR += f'/{args.batch_mode}/{args.batch_by}/{args.model}_{args.W}-{args.alpha}@{args.best_k}'
+    OUTPUT_SAVE_DIR += f'/{args.batch_mode}/{args.batch_by}/{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}'
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
     os.makedirs(OUTPUT_SAVE_DIR, exist_ok=True)
 
-    MODEL_FILE = f"{args.model}_{args.W}-{args.alpha}@{args.best_k}.pth"
+    MODEL_FILE = f"{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.pth"
     args.model_path = os.path.join(MODEL_DIR, MODEL_FILE)
 
     print("Configurations:")
@@ -333,9 +333,9 @@ if __name__ == "__main__":
     if args.out == True:
         RUNS_DIR = f"runs/{args.dataset}"
         os.makedirs(RUNS_DIR, exist_ok=True)
-        training_losses_file = os.path.join(RUNS_DIR, f"training_losses_{args.model}_{args.W}-{args.alpha}@{args.best_k}.csv")
-        train_logs_file = os.path.join(RUNS_DIR, f"train_logs_{args.model}_{args.W}-{args.alpha}@{args.best_k}.csv")
-        valid_logs_file = os.path.join(RUNS_DIR, f"valid_logs_{args.model}_{args.W}-{args.alpha}@{args.best_k}.csv")
+        training_losses_file = os.path.join(RUNS_DIR, f"training_losses_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
+        train_logs_file = os.path.join(RUNS_DIR, f"train_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
+        valid_logs_file = os.path.join(RUNS_DIR, f"valid_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
 
         ## Clear File contents before run
         open(training_losses_file, 'w').close()
@@ -467,4 +467,4 @@ if __name__ == "__main__":
 
     results_df = pd.DataFrame(test_results).round(4)
     if args.out == True:
-        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.W}-{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")
+        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv"), index=False, float_format="%.4f")
