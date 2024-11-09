@@ -258,8 +258,8 @@ if __name__ == "__main__":
         valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn)
     else:
         if args.batch_mode == 'neighbor':
-            train_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng, neighbor_type=args.batch_by)
-            valid_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng, neighbor_type=args.batch_by)
+            train_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng, group_size=args.batch_size, neighbor_type=args.batch_by)
+            valid_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng, group_size=args.batch_size, neighbor_type=args.batch_by)
             train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
             valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
         elif args.batch_by == 'user':

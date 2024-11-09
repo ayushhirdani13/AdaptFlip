@@ -106,4 +106,5 @@ class CDAE(nn.Module):
     def forward(self, user, item_vec):
         item_vec = F.dropout(item_vec, p=self.corruption_ratio, training=self.training)
         encoder = self.encoder(item_vec) + self.user_embedding(user)
+        encoder = F.sigmoid(encoder)
         return self.decoder(encoder)

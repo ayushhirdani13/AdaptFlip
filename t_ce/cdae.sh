@@ -1,16 +1,16 @@
 # Configurations
 dataset="movielens"              # dataset used for training
-corruption_ratio=0.2              # corruption ratio
+corruption_ratio=0.25              # corruption ratio
 drop_rate=0                       # initial drop rate
 num_gradual=0                 # epochs for linear increase in drop_rate
 exponent=1                        # exponent for drop rate adjustment
 lr=0.001                          # learning rate
-batch_size=32                      # batch size
+batch_size=64                      # batch size
 epochs=30                       # number of epochs for training
 eval_freq=2000                    # evaluation frequency
 top_k="3 5 10 20"                 # top-k metrics as a list of values
 best_k=10                          # best-k for saving model checkpoint
-factor_num=200                     # number of hidden factors
+factor_num=256                     # number of hidden factors
 out='True'                        # if save outputs
 gpu="0"                           # GPU ID
 
