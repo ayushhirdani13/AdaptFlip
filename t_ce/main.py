@@ -212,7 +212,7 @@ if __name__ == "__main__":
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
 
-    MODEL_FILE = f"{args.model}_{args.drop_rate}-{args.num_gradual}@{args.best_k}.pth"
+    MODEL_FILE = f"{args.model}_{args.drop_rate}_{args.num_gradual}_{args.batch_size}@{args.best_k}.pth"
     args.model_path = os.path.join(MODEL_DIR, MODEL_FILE)
 
     print("Configurations:")
@@ -333,4 +333,4 @@ if __name__ == "__main__":
 
     results_df = pd.DataFrame(test_results).round(4)
     if args.out == True:
-        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.drop_rate}-{args.num_gradual}@{args.best_k}.csv"), index=False, float_format="%.4f")
+        results_df.to_csv(os.path.join(RESULT_DIR, f"{args.model}_{args.drop_rate}_{args.num_gradual}_{args.batch_size}@{args.best_k}.csv"), index=False, float_format="%.4f")
