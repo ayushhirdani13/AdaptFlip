@@ -146,7 +146,6 @@ def test(model, test_data_pos, user_pos):
     test_results_dict = get_results_dict(test_results, top_k)
 
     # print(f"################### TEST ######################")
-    testres = pd.DataFrame(test_results, index=[f"@{i}" for i in args.top_k]).round(4).head()
     # print(pd.DataFrame(test_results, index=[f"@{i}" for i in args.top_k]).round(4).head())
     # print("################### TEST END ######################\n")
 
@@ -240,24 +239,24 @@ if __name__ == "__main__":
 
     ## Prepare Datasets
     if args.batch_by == 'none':
-        train_dataset = data_utils.NCF_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng)
-        valid_dataset = data_utils.NCF_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng)
+        train_dataset = data_utils.NCF_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=0, num_ng=args.num_ng)
+        valid_dataset = data_utils.NCF_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=1, num_ng=args.num_ng)
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn)
         valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn)
     else:
         if args.batch_mode == 'neighbor':
-            train_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng, group_size=args.batch_size, neighbor_type=args.batch_by)
-            valid_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng, group_size=args.batch_size, neighbor_type=args.batch_by)
+            train_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=0, num_ng=args.num_ng, group_size=args.batch_size, neighbor_type=args.batch_by)
+            valid_dataset = data_utils.NCF_NeighborWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=1, num_ng=args.num_ng, group_size=args.batch_size, neighbor_type=args.batch_by)
             train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
             valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=True, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
         elif args.batch_by == 'user':
-            train_dataset = data_utils.NCF_UserWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng)
-            valid_dataset = data_utils.NCF_UserWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng)
+            train_dataset = data_utils.NCF_UserWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=0, num_ng=args.num_ng)
+            valid_dataset = data_utils.NCF_UserWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=1, num_ng=args.num_ng)
             train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
             valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
         elif args.batch_by == 'item':
-            train_dataset = data_utils.NCF_ItemWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=1, num_ng=args.num_ng)
-            valid_dataset = data_utils.NCF_ItemWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=0, num_ng=args.num_ng)
+            train_dataset = data_utils.NCF_ItemWise_Dataset(user_num, item_num, train_data_list, train_mat, train_data_true_label, is_training=0, num_ng=args.num_ng)
+            valid_dataset = data_utils.NCF_ItemWise_Dataset(user_num, item_num, valid_data_list, train_mat, valid_data_true_label, is_training=1, num_ng=args.num_ng)
             train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
             valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True, worker_init_fn=worker_init_fn, collate_fn=custom_collate_fn)
     
@@ -300,7 +299,7 @@ if __name__ == "__main__":
         epoch_loss = epoch_loss / len(train_loader)
         eval_loss = evalModel(model, valid_loader, count)
 	    
-        print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Train Loss: {epoch_loss:.4f}", f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Eval Loss: {eval_loss:.4f}")
+        print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Train Loss: {epoch_loss}, Eval Loss: {eval_loss}")
         curr_recall, curr_test_results = test(model, test_data_pos, user_pos)
         curr_test_results["Validation Loss"] = eval_loss
 

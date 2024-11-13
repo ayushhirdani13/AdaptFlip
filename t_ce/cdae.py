@@ -125,9 +125,9 @@ def test(model, test_data_pos, user_pos, observed_mat):
 
     test_results_dict = get_results_dict(test_results, top_k)
 
-    print(f"################### TEST ######################")
-    print(pd.DataFrame(test_results, index=[f"@{i}" for i in args.top_k]).round(4).head())
-    print("################### TEST END ######################\n")
+    # print(f"################### TEST ######################")
+    # print(pd.DataFrame(test_results, index=[f"@{i}" for i in args.top_k]).round(4).head())
+    # print("################### TEST END ######################\n")
 
     return recall[args.best_k_ind], test_results_dict
 
@@ -220,12 +220,12 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            epoch_loss += loss.item()
         
         epoch_loss = epoch_loss / len(train_loader)
-        print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Train Loss: {epoch_loss:.4f}")
 
         eval_loss = evalModel(model, valid_loader, count, device)
-        print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Eval Loss: {eval_loss:.4f}")
+        print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Train Loss: {epoch_loss}, Eval Loss: {eval_loss}")
         curr_recall, curr_test_results = test(model, test_data_pos, user_pos, observed_mat)
         curr_test_results["Validation Loss"] = eval_loss
         if curr_recall > best_recall:

@@ -208,12 +208,13 @@ class NCF_NeighborWise_Dataset(NCF_Dataset):
             self.clusters_per_sample[sample] = cluster_id
             group_size = 1
 
-            for similar_sample in similar_samples[1:]:
-                if self.clusters_per_sample[similar_sample] == -1:
-                    self.clusters_per_sample[similar_sample] = cluster_id
-                    group_size += 1
-                    if group_size >= self.group_size:
-                        break
+            if group_size < self.group_size:
+                for similar_sample in similar_samples[1:]:
+                    if self.clusters_per_sample[similar_sample] == -1:
+                        self.clusters_per_sample[similar_sample] = cluster_id
+                        group_size += 1
+                        if group_size >= self.group_size:
+                            break
             cluster_id += 1
         ## Edge case
         if cluster_id < self.cluster_num:

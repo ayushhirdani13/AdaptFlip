@@ -259,12 +259,13 @@ class NCF_NeighborWise_Dataset(NCF_Dataset):
             self.clusters_per_sample[sample] = cluster_id
             group_size = 1
 
-            for similar_sample in similar_samples[1:]:
-                if self.clusters_per_sample[similar_sample] == -1:
-                    self.clusters_per_sample[similar_sample] = cluster_id
-                    group_size += 1
-                    if group_size >= self.group_size:
-                        break
+            if group_size < self.group_size:
+                for similar_sample in similar_samples[1:]:
+                    if self.clusters_per_sample[similar_sample] == -1:
+                        self.clusters_per_sample[similar_sample] = cluster_id
+                        group_size += 1
+                        if group_size >= self.group_size:
+                            break
             cluster_id += 1
         ## Edge case
         if cluster_id < self.cluster_num:
@@ -379,10 +380,16 @@ class CDAE_Data(Dataset):
         return idx, item_vec, label_vec, true_label_vec
     
     def flip_labels(self, flip_inds):
-        flip0_1 = (self.train_mat[flip_inds[:, 0], flip_inds[:, 1]] == 0).sum()
-        flip1_0 = (self.train_mat[flip_inds[:, 0], flip_inds[:, 1]] == 1).sum()
+        values = self.train_mat[flip_inds[:, 0], flip_inds[:, 1]]
+        if isinstance(values, np.matrix):
+            values = values.getA1()
+        else:
+            values = values.toarray().flatten()
+            
+        flip0_1 = (values == 0).sum()
+        flip1_0 = (values == 1).sum()
         
-        self.train_mat[flip_inds[:, 0], flip_inds[:, 1]] = 1 - self.train_mat[flip_inds[:, 0], flip_inds[:, 1]]
+        self.train_mat[flip_inds[:, 0], flip_inds[:, 1]] = 1 - values
 
         print(f"Flips 0 to 1: {flip0_1}")
         print(f"Flips 1 to 0: {flip1_0}")
