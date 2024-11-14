@@ -292,7 +292,6 @@ if __name__ == "__main__":
     train_log = defaultdict(float)
 
     train_log_buffer = []
-    valid_log_buffer = []
     training_losses_buffer = []
     flip_inds_buffer = set()
 
@@ -301,12 +300,10 @@ if __name__ == "__main__":
         os.makedirs(RUNS_DIR, exist_ok=True)
         training_losses_file = os.path.join(RUNS_DIR, f"training_losses_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
         train_logs_file = os.path.join(RUNS_DIR, f"train_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
-        valid_logs_file = os.path.join(RUNS_DIR, f"valid_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
 
         ## Clear File contents before run
         open(training_losses_file, 'w').close()
         open(train_logs_file, 'w').close()
-        open(valid_logs_file, 'w').close()
 
     for epoch in range(args.epochs):
         model.train()
@@ -393,19 +390,12 @@ if __name__ == "__main__":
 
             if len(train_log_buffer) > 0:
                 with open(train_logs_file, 'a', newline='') as f:
-                    NAMES = ["user", "item", "epoch", "loss", "train_label"]
+                    NAMES = ["user", "item", "epoch", "loss", "grad", "train_label"]
                     df = pd.DataFrame(train_log_buffer, columns=NAMES)
-                    df.to_csv(f, mode='a',index=False, header=False)
-
-            if len(valid_log_buffer) > 0:
-                with open(valid_logs_file, 'a', newline='') as f:
-                    NAMES = ["user", "item", "epoch", "loss", "train_label"]
-                    df = pd.DataFrame(valid_log_buffer, columns=NAMES)
                     df.to_csv(f, mode='a',index=False, header=False)
 
         training_losses_buffer.clear()
         train_log_buffer.clear()
-        valid_log_buffer.clear()
 
         if curr_recall > best_recall:
             best_recall = curr_recall

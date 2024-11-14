@@ -224,7 +224,7 @@ class NCF_NeighborWise_Dataset(NCF_Dataset):
         self.assign_cluster_ids(neighbor_type)
         print(f"Cluster num: {self.cluster_num}")
         print(f"Group size: {self.group_size}")
-        assert self.cluster_num == np.unique(self.clusters_per_user).shape[0]
+        assert self.cluster_num == np.unique(self.clusters_per_sample).shape[0]
 
     def ng_sample(self):
         super().ng_sample()
