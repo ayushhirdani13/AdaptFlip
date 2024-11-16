@@ -266,6 +266,8 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+
+            count += 1
         
         if (epoch + 1) % args.W == 0:
             print("Train Dataset State")

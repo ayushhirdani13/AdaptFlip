@@ -221,6 +221,8 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+
+            count += 1
         
         epoch_loss = epoch_loss / len(train_loader)
 
