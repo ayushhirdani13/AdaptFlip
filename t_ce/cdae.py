@@ -141,6 +141,7 @@ def evalModel(model, valid_loader, count, device='cpu'):
         item_mat = item_mat.float().to(device)
 
         prediction = model(user, item_mat)
+        print(drop_rate_schedule(count))
         loss = truncated_loss_cdae(prediction, item_mat, drop_rate_schedule(count))
         eval_loss += loss.item()
     return eval_loss
@@ -221,6 +222,8 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+
+            count += 1
         
         epoch_loss = epoch_loss / len(train_loader)
 
