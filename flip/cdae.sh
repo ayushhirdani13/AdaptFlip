@@ -3,6 +3,7 @@ dataset="ml-1m"              # dataset used for training
 corruption_ratio=0.2              # corruption ratio
 W=2                       # Window Size
 alpha=1                 # alpha in Q3 + alpha * IQR
+batch_mode='random'               # batch mode: {random, neighbor}
 lr=0.001                          # learning rate
 batch_size=64                      # batch size
 epochs=10                       # number of epochs for training
@@ -14,7 +15,7 @@ out='True'                        # if save outputs
 gpu="0"                           # GPU ID
 
 mkdir -p logs/${dataset}/loss;
-log_path=logs/${dataset}/loss/CDAE_${W}_${alpha}@${best_k}.log;
+log_path=logs/${dataset}/loss/${batch_mode}/CDAE_${W}_${alpha}@${best_k}.log;
 echo "log_path=${log_path}";
 
 # Run the script with all parameters
@@ -23,6 +24,7 @@ python -u cdae.py \
     --corruption_ratio $corruption_ratio \
     --W $W \
     --alpha $alpha \
+    --batch_mode $batch_mode \
     --lr $lr \
     --batch_size $batch_size \
     --epochs $epochs \

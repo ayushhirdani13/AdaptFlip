@@ -322,3 +322,58 @@ class CDAE_Data(Dataset):
         item_vec = self.train_mat.getrow(idx).toarray()[0]
         true_label_vec = self.true_label.getrow(idx).toarray()[0]
         return idx, item_vec, true_label_vec
+    
+class CDAE_Neighbor_Data(CDAE_Data):
+    def __init__(self, train_mat, user_num, item_num, true_label, group_size=2):
+        super().__init__(train_mat, user_num, item_num, true_label)
+        assert group_size >= 1, "Group size must be at least 1"
+        self.group_size = group_size
+        self.assign_cluster_ids()
+        print(f"Cluster num: {self.cluster_num}")
+        print(f"Group size: {self.group_size}")
+        assert self.cluster_num == np.unique(self.clusters_per_sample).shape[0]
+
+    def assign_cluster_ids(self):
+        train_mat = self.train_mat.tocsr()
+        similarity_matrix = cosine_similarity(train_mat, dense_output=False)
+        self.cluster_num = self.user_num // self.group_size + (self.user_num % self.group_size != 0)
+        unique_samples = self.user_num
+        self.clusters_per_sample = np.full(unique_samples, -1, dtype=np.int32)
+        cluster_id = 0
+        
+        for sample in range(unique_samples):
+            if cluster_id == (unique_samples // self.group_size):
+                break
+            if self.clusters_per_sample[sample] != -1:
+                continue
+
+            self.clusters_per_sample[sample] = cluster_id
+            similar_samples = np.argsort(-similarity_matrix[sample].toarray().flatten())
+            self.clusters_per_sample[sample] = cluster_id
+            group_size = 1
+
+            if group_size < self.group_size:
+                for similar_sample in similar_samples[1:]:
+                    if self.clusters_per_sample[similar_sample] == -1:
+                        self.clusters_per_sample[similar_sample] = cluster_id
+                        group_size += 1
+                        if group_size >= self.group_size:
+                            break
+            cluster_id += 1
+        ## Edge case
+        if cluster_id < self.cluster_num:
+            for sample in range(unique_samples):
+                if self.clusters_per_sample[sample] == -1:
+                    self.clusters_per_sample[sample] = cluster_id
+
+
+    def __len__(self):
+        return self.cluster_num
+    
+    def __getitem__(self, cluster_id):
+        cluster_mask = self.clusters_per_sample == cluster_id
+        users = np.arange(self.user_num)[cluster_mask]
+        item_vec = self.train_mat[cluster_mask, :].toarray()
+        true_label_vec = self.true_label[cluster_mask, :].toarray()
+        
+        return users, item_vec, true_label_vec

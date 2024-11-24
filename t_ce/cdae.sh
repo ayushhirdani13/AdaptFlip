@@ -4,6 +4,7 @@ corruption_ratio=0.25              # corruption ratio
 drop_rate=0                       # initial drop rate
 num_gradual=0                 # epochs for linear increase in drop_rate
 exponent=1                        # exponent for drop rate adjustment
+batch_mode='random'               # batch mode: {random, neighbor}
 lr=0.0025                          # learning rate
 batch_size=128                      # batch size
 epochs=30                       # number of epochs for training
@@ -25,6 +26,7 @@ python -u cdae.py \
     --drop_rate $drop_rate \
     --num_gradual $num_gradual \
     --exponent $exponent \
+    --batch_mode $batch_mode \
     --lr $lr \
     --batch_size $batch_size \
     --epochs $epochs \

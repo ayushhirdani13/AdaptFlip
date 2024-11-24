@@ -35,6 +35,11 @@ def parse_args():
         type=float,
         default=1,
         help="alpha in Q3 + alpha * IQR, default: 1",)
+    parser.add_argument("--batch_mode",
+        type=str,
+        default="random",
+        help="batch mode, default: user",
+        choices=["neighbor", "random"])
     parser.add_argument("--lr",
         type=float,
         default=0.001,
@@ -185,6 +190,9 @@ if __name__ == '__main__':
     MODEL_DIR = f"models/{DATASET}/loss"
     RESULT_DIR = f"results/{DATASET}/loss"
     OUTPUT_SAVE_DIR = f"outputs/{DATASET}/loss"
+    MODEL_DIR += f'/{args.batch_mode}'
+    RESULT_DIR += f'/{args.batch_mode}'
+    OUTPUT_SAVE_DIR += f'/{args.batch_mode}'
     OUTPUT_SAVE_DIR += f'/CDAE_{args.W}_{args.alpha}@{args.best_k}'
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(RESULT_DIR, exist_ok=True)
@@ -215,11 +223,19 @@ if __name__ == '__main__':
     print(f"Test Users: {len(test_data_pos)}")
 
     # Prepare Dataset
-    train_dataset = data_utils.CDAE_Data(train_mat=train_mat, user_num=user_num, item_num=item_num, true_label=train_data_true)
-    valid_dataset = data_utils.CDAE_Data(train_mat=valid_mat, user_num=user_num, item_num=item_num, true_label=valid_data_true)
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, worker_init_fn=worker_init_fn)
-    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, worker_init_fn=worker_init_fn)
+    if args.batch_mode == "neighbor":
+        train_dataset = data_utils.CDAE_Neighbor_Data(train_mat=train_mat, user_num=user_num, item_num=item_num, true_label=train_data_true, group_size=args.batch_size)
+        valid_dataset = data_utils.CDAE_Neighbor_Data(train_mat=valid_mat, user_num=user_num, item_num=item_num, true_label=valid_data_true, group_size=args.batch_size)
+
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4, worker_init_fn=worker_init_fn)
+        valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=1, shuffle=True, num_workers=4, worker_init_fn=worker_init_fn)
+    else:
+        train_dataset = data_utils.CDAE_Data(train_mat=train_mat, user_num=user_num, item_num=item_num, true_label=train_data_true)
+        valid_dataset = data_utils.CDAE_Data(train_mat=valid_mat, user_num=user_num, item_num=item_num, true_label=valid_data_true)
+
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, worker_init_fn=worker_init_fn)
+        valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, worker_init_fn=worker_init_fn)
 
     model = models.CDAE(user_num=user_num, item_num=item_num, factor_num=args.factor_num, corruption_ratio=args.corruption_ratio).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
