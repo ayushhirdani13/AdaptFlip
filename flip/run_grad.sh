@@ -23,7 +23,7 @@ log_path=logs/${dataset}/grad/${batch_mode}/${batch_by}/${model}_${W}_${alpha}_$
 echo "log_path=${log_path}";
 
 # Run the script with all parameters
-python -u main.py \
+python -u main_grad.py \
     --dataset $dataset \
     --model $model \
     --W $W \

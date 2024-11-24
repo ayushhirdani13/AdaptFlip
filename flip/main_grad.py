@@ -347,7 +347,7 @@ if __name__ == "__main__":
                 i = item_cpu[ind]
 
                 # Update train_log in batch
-                grad_val = torch.autograd.grad(loss_all[ind], model.predict_layer.weight, retain_graph=True, create_graph=False)[0].mean().item()
+                grad_val = torch.linalg.vector_norm(x=torch.autograd.grad(loss_all[ind], model.predict_layer.weight, retain_graph=True, create_graph=False)[0], ord=2).item()
                 loss_val = loss_all_cpu[ind]
                 train_label = int(train_label_cpu[ind])
                 train_log_buffer.append([u, i, epoch, f"{loss_val:.4f}", f"{grad_val}",train_label])
