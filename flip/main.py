@@ -132,9 +132,9 @@ def test(model, test_data_pos, user_pos):
 
     test_results_dict = get_results_dict(test_results, top_k)
 
-    # print(f"################### TEST ######################")
-    # print(pd.DataFrame(test_results, index=[f"@{i}" for i in args.top_k]).round(4).head())
-    # print("################### TEST END ######################\n")
+    print(f"################### TEST ######################")
+    print(pd.DataFrame(test_results, index=[f"@{i}" for i in args.top_k]).round(4).head())
+    print("################### TEST END ######################\n")
 
     return recall[args.best_k_ind], test_results_dict
 
