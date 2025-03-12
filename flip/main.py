@@ -90,8 +90,8 @@ def parse_args():
         help="sample negative items for training, default: 1")
     parser.add_argument("--out",
         type=str,
-        default=True,
-        help="save model or not, default: True")
+        default=False,
+        help="save model or not, default: False")
     parser.add_argument("--gpu",
         type=str,
         default="0",
@@ -274,8 +274,7 @@ if __name__ == "__main__":
         valid_data_list,
         valid_data_true_label,
         user_pos,
-        test_data_pos,
-        test_df
+        test_data_pos
     ) = data_utils.load_data(DATASET, DATAPATH)
 
     print("Data Loaded")

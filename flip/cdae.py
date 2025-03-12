@@ -75,8 +75,8 @@ def parse_args():
         help="predictive factors numbers in the model, default: 200",)
     parser.add_argument("--out",
         type=str,
-        default=True,
-        help="save model or not, default: True")
+        default=False,
+        help="save model or not, default: False")
     parser.add_argument("--gpu",
         type=str,
         default="0",
