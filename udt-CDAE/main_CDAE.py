@@ -42,6 +42,7 @@ parser.add_argument("--batch_size",
 	help="epoch to start evaluation")
 parser.add_argument("--top_k", 
     type = list,
+    nargs='+',
 	default= [50, 100],
 	help="compute metrics @k")
 parser.add_argument("--temp1", 
@@ -71,6 +72,7 @@ torch.cuda.manual_seed(args.seed) #gpu
 np.random.seed(args.seed) #numpy
 random.seed(args.seed) #random and transforms
 torch.backends.cudnn.deterministic=True # cudnn
+device = f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu"
 
 def worker_init_fn(worker_id):
     np.random.seed(args.seed + worker_id)
@@ -99,7 +101,7 @@ valid_loader = data.DataLoader(valid_dataset, batch_size=4096, shuffle=True)
 ########################### CREATE MODEL #################################
 
 model = model.CDAE(user_num, item_num, 32, 0.2)
-model.cuda()
+model.to(device)
 BCE_loss = nn.BCEWithLogitsLoss(reduction='none')
 num_ns = 1 # negative samples
 optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -119,12 +121,12 @@ def eval(model, valid_loader, valid_data_pos, train_mat, best_recall, count):
     GroundTruth = list(valid_data_pos.values()) # ground truth is exact item indices
     for user_valid, data_value_valid in valid_loader:
         with torch.no_grad():
-            user_valid = user_valid.cuda()
-            prediction_input_from_train = torch.tensor(train_mat[user_valid.cpu()]).cuda()
+            user_valid = user_valid.to(device)
+            prediction_input_from_train = torch.tensor(train_mat[user_valid.cpu()]).to(device)
             prediction = model(user_valid, prediction_input_from_train) # prediction of the batch from train matrix
             valid_data_mask = train_mat[user_valid.cpu()] * -9999# depends on the size of data
 
-            prediction = prediction + torch.tensor(valid_data_mask).float().cuda()
+            prediction = prediction + torch.tensor(valid_data_mask).float().to(device)
             _, indices = torch.topk(prediction, top_k[-1])
             predictedIndices_all[user_valid.cpu()] = indices.cpu()
 
@@ -141,19 +143,19 @@ def eval(model, valid_loader, valid_data_pos, train_mat, best_recall, count):
     
 
 ########################### Test #####################################
-def test(model, test_data_pos, train_mat, valid_mat):
+def test(model, test_data_pos, train_mat, valid_mat, device='cuda'):
     top_k = args.top_k
     model.eval()
     predictedIndices = [] # predictions
     GroundTruth = list(test_data_pos.values())
 
     for users in toolz.partition_all(1000, list(test_data_pos.keys())): # looping through users in test set
-        user_id = torch.tensor(list(users)).cuda()
-        data_value_test = torch.tensor(train_mat[list(users)]).cuda()
+        user_id = torch.tensor(list(users)).to(device)
+        data_value_test = torch.tensor(train_mat[list(users)]).to(device)
         predictions = model(user_id, data_value_test) # model prediction for given data
         test_data_mask = (train_mat_dense[list(users)] + valid_mat[list(users)]) * -9999
 
-        predictions = predictions + torch.tensor(test_data_mask).float().cuda()
+        predictions = predictions + torch.tensor(test_data_mask).float().to(device)
         _, indices = torch.topk(predictions, top_k[-1]) # returns sorted index based on highest probability
         indices = indices.cpu().numpy().tolist()
         predictedIndices += indices # a list of top 100 predicted indices
@@ -180,8 +182,8 @@ for epoch in range(1000):
     train_loss = 0
 
     for user, data_value in train_loader:
-        user = user.cuda()
-        data_value = data_value.cuda()
+        user = user.to(device)
+        data_value = data_value.to(device)
         prediction = model(user, data_value)
         #negative sampling
         with torch.no_grad():
@@ -231,7 +233,7 @@ for epoch in range(1000):
                     ui_loss_factor = torch.cat((ui_loss_factor, ui_factor))
 
         
-        ui_loss_factor = ui_loss_factor.cuda()
+        ui_loss_factor = ui_loss_factor.to(device)
 
         # calculating loss
 
@@ -250,13 +252,13 @@ for epoch in range(1000):
     print(f"Epoch: {epoch} Train loss: {train_loss}") 
     if epoch%20==0 or epoch >=args.epoch_eval:
         # validation
-        best_recall, count = eval(model, valid_loader, valid_data_pos, train_mat_dense, best_recall, count)
+        best_recall, count = eval(model, valid_loader, valid_data_pos, train_mat_dense, best_recall, count, device=device)
 
         if count == 10:
             break
 
 print("############################## Training End. ##############################")
 model.load_state_dict(torch.load(model_path+f'CDAE_{args.dataset}_{args.temp1}_{args.temp2}_{args.userfact1}_{args.userfact2}.pth'))
-model.cuda()
+model.to(device)
 
-test(model, test_data_pos, train_mat_dense, valid_mat_dense)
+test(model, test_data_pos, train_mat_dense, valid_mat_dense, device=device)

@@ -201,7 +201,7 @@ if __name__ == "__main__":
     np.random.seed(2024) #numpy
     random.seed(2024) #random and transforms
     torch.backends.cudnn.deterministic=True # cudnn
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu"
 
     DATASET = args.dataset
     DATAPATH = f"../data/{DATASET}"

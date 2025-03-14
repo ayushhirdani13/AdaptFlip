@@ -39,6 +39,7 @@ parser.add_argument("--epoch_eval",
 	help="epoch to start evaluation")
 parser.add_argument("--top_k", 
     type = list,
+    nargs='+',
 	default= [50, 100],
 	help="compute metric @topk")
 parser.add_argument("--batch_size", 
@@ -71,6 +72,7 @@ torch.cuda.manual_seed(args.seed) #gpu
 np.random.seed(args.seed) #numpy
 random.seed(args.seed) #random and transforms
 torch.backends.cudnn.deterministic=True # cudnn
+device = f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu"
 
 def worker_init_fn(worker_id):
     np.random.seed(args.seed + worker_id)
@@ -101,7 +103,7 @@ print("data loaded! user_num:{}, item_num:{} train_data_len:{} test_user_num:{}"
 model = model.NCF(user_num, item_num, 32, 3, 
 						0.0, f'{args.model}', None, None)
 
-model.cuda()
+model.to(device)
 BCE_loss = nn.BCEWithLogitsLoss(reduction='none')
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 train_mat_dense = torch.tensor(train_mat.toarray()).cpu()
@@ -115,7 +117,7 @@ def temperature_scaled_softmax(logits,temperature):
     return torch.softmax(logits, dim=1)
     
 ########################### Eval #####################################
-def eval(model, valid_pos, mat, best_recall, count):
+def eval(model, valid_pos, mat, best_recall, count, device='cuda'):
     top_k = args.top_k
     model.eval()
     predictedIndices = []
@@ -124,10 +126,10 @@ def eval(model, valid_pos, mat, best_recall, count):
     for users_valid in toolz.partition_all(15,users_in_valid):
         users_valid = list(users_valid)
         GroundTruth.extend([valid_pos[u] for u in users_valid])
-        users_valid_torch = torch.tensor(users_valid).repeat_interleave(item_num).cuda()  
-        items_full = torch.tensor([i for i in range(item_num)]).repeat(len(users_valid)).cuda() 
+        users_valid_torch = torch.tensor(users_valid).repeat_interleave(item_num).to(device)  
+        items_full = torch.tensor([i for i in range(item_num)]).repeat(len(users_valid)).to(device) 
         prediction = model(users_valid_torch, items_full)
-        _, indices = torch.topk(prediction.view(len(users_valid),-1)+mat[users_valid].cuda()*-9999, max(top_k))
+        _, indices = torch.topk(prediction.view(len(users_valid),-1)+mat[users_valid].to(device)*-9999, max(top_k))
         indices = indices.cpu().numpy().tolist()
         predictedIndices.extend(indices)
     precision, recall, NDCG, MRR = evaluate.compute_acc(GroundTruth, predictedIndices, top_k)
@@ -145,7 +147,7 @@ def eval(model, valid_pos, mat, best_recall, count):
     return best_recall, count
 
 ########################### Test #####################################
-def test(model, test_data_pos, mat):
+def test(model, test_data_pos, mat, device='cuda'):
     top_k = args.top_k
     model.eval()
     predictedIndices = []
@@ -154,10 +156,10 @@ def test(model, test_data_pos, mat):
     for users_test in toolz.partition_all(15,users_in_test):
         users_test = list(users_test)
         GroundTruth.extend([test_data_pos[u] for u in users_test])
-        users_test_torch = torch.tensor(users_test).repeat_interleave(item_num).cuda()  
-        items_full = torch.tensor([i for i in range(item_num)]).repeat(len(users_test)).cuda()
+        users_test_torch = torch.tensor(users_test).repeat_interleave(item_num).to(device)  
+        items_full = torch.tensor([i for i in range(item_num)]).repeat(len(users_test)).to(device)
         prediction = model(users_test_torch, items_full)
-        _, indices = torch.topk(prediction.view(len(users_test),-1)+mat[users_test].cuda()*-9999, max(top_k))
+        _, indices = torch.topk(prediction.view(len(users_test),-1)+mat[users_test].to(device)*-9999, max(top_k))
         indices = indices.cpu().numpy().tolist()
         predictedIndices.extend(indices)
     precision, recall, NDCG, MRR = evaluate.compute_acc(GroundTruth, predictedIndices, top_k)
@@ -189,9 +191,9 @@ for epoch in range(1000):
     
 
     for user, item, label, _ in train_loader:
-        user = user.cuda()
-        item = item.cuda()
-        label = label.float().cuda()
+        user = user.to(device)
+        item = item.to(device)
+        label = label.float().to(device)
 
         # for user interaction level
 
@@ -210,7 +212,7 @@ for epoch in range(1000):
             if epoch <= 1:
                 mul_factor = torch.ones_like(loss)
             else: 
-                mul_factor = ui_factor[user.cpu(), item.cpu()].cuda()
+                mul_factor = ui_factor[user.cpu(), item.cpu()].to(device)
 
         # for updating user iteraction level
         loss_ui = loss[label > 0.].cpu()
@@ -226,7 +228,7 @@ for epoch in range(1000):
     print("epoch: {}, loss:{}".format(epoch,train_loss))
     
     if epoch >= args.epoch_eval:
-        best_recall, count = eval(model, valid_pos, train_mat_dense, best_recall, count)
+        best_recall, count = eval(model, valid_pos, train_mat_dense, best_recall, count, device=device)
     model.train()
     if count == 10:
         break
@@ -252,9 +254,9 @@ for epoch in range(1000):
 
 print("############################## Training End. ##############################")
 model.load_state_dict(torch.load(model_path+f'{args.model}_{args.dataset}_{args.temp1}_{args.temp2}_{args.userfact1}_{args.userfact2}.pth'))
-model.cuda()
+model.to(device)
 
     ########################### Logs #####################################
 
 train_mat_dense = torch.tensor(train_valid_mat.toarray()).cpu() 
-test(model, test_data_pos, train_mat_dense)
+test(model, test_data_pos, train_mat_dense, device=device)

@@ -4,16 +4,16 @@ import math
 
 
 
-def test_all_users(model, batch_size, item_num, test_data_pos, user_pos, top_k):
+def test_all_users(model, batch_size, item_num, test_data_pos, user_pos, top_k, device='cuda'):
     
     predictedIndices = []
     GroundTruth = []
     for u in test_data_pos:
         batch_num = item_num // batch_size
-        batch_user = torch.Tensor([u]*batch_size).long().cuda()
+        batch_user = torch.Tensor([u]*batch_size).long().to(device)
         st, ed = 0, batch_size
         for i in range(batch_num):
-            batch_item = torch.Tensor([i for i in range(st, ed)]).long().cuda()
+            batch_item = torch.Tensor([i for i in range(st, ed)]).long().to(device)
             pred = model(batch_user, batch_item)
             if i == 0:
                 predictions = pred
@@ -21,15 +21,15 @@ def test_all_users(model, batch_size, item_num, test_data_pos, user_pos, top_k):
                 predictions = torch.cat([predictions, pred], 0)
             st, ed = st+batch_size, ed+batch_size
         ed = ed - batch_size
-        batch_item = torch.Tensor([i for i in range(ed, item_num)]).long().cuda()
-        batch_user = torch.Tensor([u]*(item_num-ed)).long().cuda()
+        batch_item = torch.Tensor([i for i in range(ed, item_num)]).long().to(device)
+        batch_user = torch.Tensor([u]*(item_num-ed)).long().to(device)
         pred = model(batch_user, batch_item)
         predictions = torch.cat([predictions, pred], 0)
         test_data_mask = [0] * item_num
         if u in user_pos:
             for i in user_pos[u]:
                 test_data_mask[i] = -9999
-        predictions = predictions + torch.Tensor(test_data_mask).float().cuda()
+        predictions = predictions + torch.Tensor(test_data_mask).float().to(device)
         _, indices = torch.topk(predictions, top_k[-1])
         indices = indices.cpu().numpy().tolist()
         predictedIndices.append(indices)
