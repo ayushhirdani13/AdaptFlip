@@ -50,7 +50,7 @@ def compute_acc(GroundTruth, predictedIndices, topN):
 
     return precision, recall, NDCG, MRR
 
-def test_all_users(model, item_num, test_data_pos, user_pos, top_k, device='cuda'):
+def test_all_users(model, item_num, test_data_pos, user_pos, top_k, device='cpu'):
     predictedIndices = []
     GroundTruth = []
     for u in test_data_pos:
@@ -71,7 +71,7 @@ def test_all_users(model, item_num, test_data_pos, user_pos, top_k, device='cuda
     precision, recall, NDCG, MRR = compute_acc(GroundTruth, predictedIndices, top_k)
     return precision, recall, NDCG, MRR
 
-def test_all_users_cdae(model, item_num, test_data_pos, user_pos, top_k, observed_mat, device='cuda'):
+def test_all_users_cdae(model, item_num, test_data_pos, user_pos, top_k, observed_mat, device='cpu'):
     predictedIndices = []
     GroundTruth = []
     for u in test_data_pos:

@@ -1,26 +1,26 @@
 # Configurations
 dataset="movielens"              # dataset used for training
 model="NeuMF"                       # model type, e.g., GMF or NeuMF
-drop_rate=0                       # initial drop rate
-num_gradual=0                 # epochs for linear increase in drop_rate
+drop_rate=0.2                       # initial drop rate
+num_gradual=1000                 # epochs for linear increase in drop_rate
 exponent=1                        # exponent for drop rate adjustment
 lr=0.001                          # learning rate
 dropout=0.0                       # dropout rate
 batch_by='none'               # batch by : {'none','user', 'item'}
 batch_mode='random'           # batch mode: {'random', 'neighbor'}
 batch_size=1024                      # batch size
-epochs=30                       # number of epochs for training
+epochs=2                       # number of epochs for training
 eval_freq=2000                    # evaluation frequency
-top_k="3 5 10 20"                 # top-k metrics as a list of values
-best_k=10                          # best-k for saving model checkpoint
+top_k="3 10 50 100"                 # top-k metrics as a list of values
+best_k=50                          # best-k for saving model checkpoint
 factor_num=32                     # number of latent factors
 mlp_layers="256 128 64"                # MLP layer sizes
 num_ng=1                          # negative samples for training
-out='True'                        # if save outputs
+out='False'                        # if save outputs
 gpu="0"                           # GPU ID
 
 mkdir -p logs/${dataset}/${batch_mode}/${batch_by};
-log_path=logs/${dataset}/${batch_mode}/${batch_by}/${model}_${drop_rate}_${num_gradual}_${batch_size}@${best_k}.log;
+log_path=logs/${dataset}/${batch_mode}/${batch_mode}/${batch_by}/${model}_${drop_rate}_${num_gradual}_${batch_size}@${best_k}.log;
 echo "log_path=${log_path}";
 
 # Run the script with all parameters

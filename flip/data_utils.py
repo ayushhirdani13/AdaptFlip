@@ -55,7 +55,7 @@ def load_data(dataset, datapath):
     test_data_pos = defaultdict(list)
     with open(test_file, "r") as f:
         for line in f.readlines():
-            user, item = line.strip().split('\t')
+            user, item, *rest = line.strip().split('\t')
             user, item = int(user), int(item)
             item_num = max(item_num, item + 1)
             test_data_pos[user].append(item)
@@ -315,7 +315,7 @@ def load_data_cdae(dataset, datapath):
     test_data_pos = defaultdict(list)
     with open(test_file, "r") as f:
         for line in f.readlines():
-            user, item = line.strip().split('\t')
+            user, item, *rest = line.strip().split('\t')
             user, item = int(user), int(item)
             item_num = max(item_num, item + 1)
             test_data_pos[user].append(item)
