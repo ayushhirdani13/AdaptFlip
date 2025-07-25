@@ -99,6 +99,10 @@ def parse_args():
         type=str,
         default="0",
         help="gpu card ID, default: 0")
+    parser.add_argument("--seed",
+        type=int,
+        default=2025,
+        help="random seed for reproducibility, default: 2025")
     
     args = parser.parse_args()
     if args.out in ["False", "false", "0"]:
@@ -153,7 +157,7 @@ def test(model, test_data_pos, user_pos):
 
 ########################### Eval #####################################
 @torch.no_grad()
-def evalModel(model, valid_loader, count, device='cuda'):
+def evalModel(model, valid_loader, count, device='cpu'):
     model.eval()
     epoch_loss = 0
     valid_loader.dataset.ng_sample()
@@ -188,7 +192,7 @@ def custom_collate_fn(batch):
 
 
 def worker_init_fn(worker_id):
-    np.random.seed(2024 + worker_id)
+    np.random.seed(args.seed + worker_id)
 
 if __name__ == "__main__":
     args = parse_args()
@@ -196,10 +200,10 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     torch.backends.cudnn.benchmark = True
 
-    torch.manual_seed(2024) # cpu
-    torch.cuda.manual_seed(2024) #gpu
-    np.random.seed(2024) #numpy
-    random.seed(2024) #random and transforms
+    torch.manual_seed(args.seed) # cpu
+    torch.cuda.manual_seed(args.seed) #gpu
+    np.random.seed(args.seed) #numpy
+    random.seed(args.seed) #random and transforms
     torch.backends.cudnn.deterministic=True # cudnn
     device = f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu"
 
@@ -296,7 +300,7 @@ if __name__ == "__main__":
             losses.append(loss.item())
             count += 1
         epoch_loss = epoch_loss / len(train_loader)
-        eval_loss = evalModel(model, valid_loader, count)
+        eval_loss = evalModel(model, valid_loader, count, device)
 	    
         print(f"Epoch[{epoch+1:03d}/{args.epochs:03d}], Train Loss: {epoch_loss}, Eval Loss: {eval_loss}")
         curr_recall, curr_test_results = test(model, test_data_pos, user_pos)

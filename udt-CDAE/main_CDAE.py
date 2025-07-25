@@ -143,7 +143,7 @@ def eval(model, valid_loader, valid_data_pos, train_mat, best_recall, count):
     
 
 ########################### Test #####################################
-def test(model, test_data_pos, train_mat, valid_mat, device='cuda'):
+def test(model, test_data_pos, train_mat, valid_mat, device='cpu'):
     top_k = args.top_k
     model.eval()
     predictedIndices = [] # predictions

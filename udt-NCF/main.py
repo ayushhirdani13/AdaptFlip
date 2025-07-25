@@ -19,7 +19,7 @@ import data_utils
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', 
 	type = str,
-	help = 'dataset used for training, options: amazon_book, yelp, movielens',
+	help = 'dataset used for training, options: amazon_book, yelp, movielens, kuai-rec',
 	default = 'yelp')
 parser.add_argument('--model', 
 	type = str,
@@ -27,8 +27,8 @@ parser.add_argument('--model',
 	default = 'GMF')
 parser.add_argument('--seed', 
 	type = int,
-	help = 'seed for reproducibility',
-	default = 2024)
+	default = 2025,
+	help = 'random seed for reproducibility, default: 2025')
 parser.add_argument("--gpu", 
 	type=str,
 	default="0",
@@ -136,7 +136,7 @@ def eval(model, valid_pos, mat, best_recall, count, device='cuda'):
     epoch_recall = recall[0]
 
     print("################### EVAL ######################")
-    print(f"Recall:{recall} NDCG: {NDCG}")
+    print(f"Recall:{recall} NDCG: {NDCG} Precision: {precision} MRR: {MRR}")
 
     if epoch_recall > best_recall:
         best_recall = epoch_recall
@@ -227,8 +227,13 @@ for epoch in range(1000):
 
     print("epoch: {}, loss:{}".format(epoch,train_loss))
     
-    if epoch >= args.epoch_eval:
+    if epoch >= 0:
         best_recall, count = eval(model, valid_pos, train_mat_dense, best_recall, count, device=device)
+        print("Test: ") 
+        test(model, test_data_pos, train_mat_dense, device=device)
+        train_mat_dense = torch.tensor(train_valid_mat.toarray()).cpu()
+        test(model, test_data_pos, train_mat_dense, device=device)
+        train_mat_dense = torch.tensor(train_mat.toarray()).cpu()
     model.train()
     if count == 10:
         break
