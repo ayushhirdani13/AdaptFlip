@@ -328,5 +328,4 @@ if __name__ == '__main__':
     print(best_results_df)
 
     results_df = pd.DataFrame(test_results).round(4)
-    if args.out == True:
-        results_df.to_csv(os.path.join(RESULT_DIR, f"CDAE_{args.W}_{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")
+    results_df.to_csv(os.path.join(RESULT_DIR, f"CDAE_{args.W}_{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")
