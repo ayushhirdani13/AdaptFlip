@@ -27,7 +27,7 @@ parser.add_argument('--dataset',
 parser.add_argument('--seed', 
 	type = int,
 	help = 'seed for reproducibility',
-	default = 2024)
+	default = 2025)
 parser.add_argument("--gpu", 
 	type=str,
 	default="1",
@@ -38,10 +38,10 @@ parser.add_argument("--epoch_eval",
 	help="epoch to start evaluation")
 parser.add_argument("--batch_size", 
     type = int,
-	default=2048,
+	default=1024,
 	help="epoch to start evaluation")
 parser.add_argument("--top_k", 
-    type = list,
+    type = int,
     nargs='+',
 	default= [50, 100],
 	help="compute metrics @k")

@@ -38,7 +38,7 @@ parser.add_argument("--epoch_eval",
 	default=10,
 	help="epoch to start evaluation")
 parser.add_argument("--top_k", 
-    type = list,
+    type = int,
     nargs='+',
 	default= [50, 100],
 	help="compute metric @topk")
