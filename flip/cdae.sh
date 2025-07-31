@@ -14,8 +14,8 @@ factor_num=256                     # number of hidden factors
 out='False'                        # if save outputs
 gpu="0"                           # GPU ID
 
-mkdir -p logs/DL/${dataset}/loss/${batch_mode};
-log_path=logs/DL/${dataset}/loss/${batch_mode}/CDAE_${W}_${alpha}@${best_k}.log;
+mkdir -p logs/${dataset}/${batch_mode};
+log_path=logs/${dataset}/${batch_mode}/CDAE_${W}_${alpha}@${best_k}.log;
 echo "log_path=${log_path}";
 
 # Run the script with all parameters
