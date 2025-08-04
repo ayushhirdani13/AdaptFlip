@@ -11,8 +11,7 @@ from torch.utils.data import Dataset
 FILE_SUFFIXES = {
     'train': '.train.rating',
     'valid': '.valid.rating',
-    'test': '.test.positive',
-    'test_all': '.test.rating'
+    'test': '.test.negative'
 }
 COLUMN_NAMES = ["user", "item", "true_label"]
 COLUMN_DTYPES = {"user": np.int32, "item": np.int32, "true_label": np.int32}
@@ -56,16 +55,10 @@ def load_data(dataset, datapath):
     test_data_pos = defaultdict(list)
     with open(test_file, "r") as f:
         for line in f.readlines():
-            user, item, _ = line.strip().split('\t')
+            user, item, *rest = line.strip().split('\t')
             user, item = int(user), int(item)
             item_num = max(item_num, item + 1)
             test_data_pos[user].append(item)
-
-    test_file = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['test_all']}")
-    if not os.path.exists(test_file):
-        raise FileNotFoundError(f"Test file '{test_file}' does not exist")
-    test_df = pd.read_csv(test_file, sep="\t", header=None, names=COLUMN_NAMES, dtype=COLUMN_DTYPES)
-    item_num = max(item_num, test_df["item"].max() + 1)
 
     return (
         user_num,
@@ -76,8 +69,7 @@ def load_data(dataset, datapath):
         valid_data_list,
         valid_data_true_label,
         user_pos,
-        test_data_pos,
-        test_df
+        test_data_pos
     )
 
 class NCF_Dataset(Dataset):
@@ -269,16 +261,10 @@ def load_data_cdae(dataset, datapath):
     test_data_pos = defaultdict(list)
     with open(test_file, "r") as f:
         for line in f.readlines():
-            user, item, _ = line.strip().split('\t')
+            user, item, *rest = line.strip().split('\t')
             user, item = int(user), int(item)
             item_num = max(item_num, item + 1)
             test_data_pos[user].append(item)
-
-    test_file = os.path.join(datapath, f"{dataset}{FILE_SUFFIXES['test_all']}")
-    if not os.path.exists(test_file):
-        raise FileNotFoundError(f"Test file '{test_file}' does not exist")
-    test_df = pd.read_csv(test_file, sep="\t", header=None, names=COLUMN_NAMES, dtype=COLUMN_DTYPES)
-    item_num = max(item_num, test_df["item"].max() + 1)
 
     train_mat = sp.csr_matrix((np.ones_like(train_data["user"]), (train_data["user"], train_data["item"])), shape=(user_num, item_num), dtype=np.int32)
     valid_mat = sp.csr_matrix((np.ones_like(valid_data["user"]), (valid_data["user"], valid_data["item"])), shape=(user_num, item_num), dtype=np.int32)

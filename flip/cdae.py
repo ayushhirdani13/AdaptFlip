@@ -75,8 +75,8 @@ def parse_args():
         help="predictive factors numbers in the model, default: 200",)
     parser.add_argument("--out",
         type=str,
-        default=True,
-        help="save model or not, default: True")
+        default=False,
+        help="save model or not, default: False")
     parser.add_argument("--gpu",
         type=str,
         default="0",
@@ -183,7 +183,7 @@ if __name__ == '__main__':
     np.random.seed(2024) #numpy
     random.seed(2024) #random and transforms
     torch.backends.cudnn.deterministic=True # cudnn
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu"
 
     DATASET = args.dataset
     DATAPATH = f"../data/{DATASET}"
@@ -328,5 +328,4 @@ if __name__ == '__main__':
     print(best_results_df)
 
     results_df = pd.DataFrame(test_results).round(4)
-    if args.out == True:
-        results_df.to_csv(os.path.join(RESULT_DIR, f"CDAE_{args.W}_{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")
+    results_df.to_csv(os.path.join(RESULT_DIR, f"CDAE_{args.W}_{args.alpha}@{args.best_k}.csv"), index=False, float_format="%.4f")
