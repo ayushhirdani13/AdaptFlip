@@ -85,7 +85,7 @@ def parse_args():
         default=[256, 128, 64],
         help="number of layers in MLP model, default: [256, 128, 64]")
     parser.add_argument("--num_ng",
-        type=int,
+        type=float,
         default=1,
         help="sample negative items for training, default: 1")
     parser.add_argument("--out",

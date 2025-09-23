@@ -93,15 +93,36 @@ class NCF_Dataset(Dataset):
             self.labels_fill = self.labels
             self.true_labels_fill = self.true_labels
             self.train_labels_fill = self.train_labels
+        elif 0 < self.num_ng < 1:
+            # For each user, sample a fraction of negatives per positive
+            user_ids = np.unique(self.features[:, 0])
+            negative_samples = []
+            for u in user_ids:
+                user_mask = self.features[:, 0] == u
+                num_pos = np.sum(user_mask)
+                num_neg = int(np.round(self.num_ng * num_pos))
+                neg_count = 0
+                while neg_count < num_neg:
+                    j = np.random.randint(self.item_num)
+                    if (u, j) not in self.train_mat:
+                        negative_samples.append((u, j))
+                        neg_count += 1
+            self.negative_samples = np.array(negative_samples)
+            self.features_fill = np.concatenate((self.features, self.negative_samples))
+            self.labels_fill = np.concatenate((self.labels, np.zeros(self.negative_samples.shape[0], dtype=np.int32)))
+            self.true_labels_fill = np.concatenate((self.true_labels, np.zeros(self.negative_samples.shape[0], dtype=np.int32)))
+            self.train_labels_fill = np.concatenate((self.train_labels, np.zeros(self.negative_samples.shape[0], dtype=np.int32)))
+            assert self.features_fill.shape[0] == self.labels_fill.shape[0]
+            assert self.features_fill.shape[0] == self.true_labels_fill.shape[0]
+            assert self.features_fill.shape[0] == self.train_labels_fill.shape[0]
         else:
             self.negative_samples = []
-            for _ in range(self.num_ng):
+            for _ in range(int(self.num_ng)):
                 for u, _ in self.features:
                     j = np.random.randint(self.item_num)
-                    while (u,j) in self.train_mat:
+                    while (u, j) in self.train_mat:
                         j = np.random.randint(self.item_num)
-                    self.negative_samples.append((u,j))
-            
+                    self.negative_samples.append((u, j))
             self.negative_samples = np.array(self.negative_samples)
             self.features_fill = np.concatenate((self.features, self.negative_samples))
             self.labels_fill = np.concatenate((self.labels, np.zeros(self.negative_samples.shape[0], dtype=np.int32)))
