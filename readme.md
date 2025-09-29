@@ -1,7 +1,7 @@
 # AdaptFlip
 Repository for code on denoising approaches in recommendation systems
 
-For Running AdaptFlip Code for NCF, go to `AdaptFlip` directory and run:
+For Running AdaptFlip Code for NCF, go to `src` directory and run:
 ```bash
 python -u main.py --dataset 'movielens' --W 3 --alpha 1.5
 ```

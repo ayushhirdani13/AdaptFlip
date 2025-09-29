@@ -86,6 +86,16 @@ class NCF_Dataset(Dataset):
         self.user_num = user_num
         self.item_num = item_num
 
+        self.size = 0
+        user_ids = np.unique(self.features[:, 0])
+        for u in user_ids:
+            user_mask = self.features[:, 0] == u
+            num_pos = np.sum(user_mask)
+            num_neg = 0
+            if self.is_training != 2:
+                num_neg = int(np.round(self.num_ng * num_pos))
+            self.size += num_pos + num_neg
+
     def ng_sample(self):
         assert self.is_training != 2, "Sampling only for training mode"
         if self.num_ng == 0:
@@ -156,7 +166,7 @@ class NCF_Dataset(Dataset):
         pd.DataFrame({"user": user, "item": item, "train_label": train_label}).to_csv(SAVE_PATH, index=False, header=False, sep="\t")
 
     def __len__(self):
-        return int(len(self.features) * (self.num_ng + 1))
+        return self.size
 
     def __getitem__(self, idx):
         features = self.features_fill if self.is_training != 2 else self.features_ps
