@@ -336,9 +336,9 @@ if __name__ == "__main__":
     if args.out == True:
         RUNS_DIR = f"runs/{args.dataset}"
         os.makedirs(RUNS_DIR, exist_ok=True)
-        training_losses_file = os.path.join(RUNS_DIR, f"training_losses_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
-        train_logs_file = os.path.join(RUNS_DIR, f"train_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
-        valid_logs_file = os.path.join(RUNS_DIR, f"valid_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}@{args.best_k}.csv")
+        training_losses_file = os.path.join(RUNS_DIR, f"training_losses_{args.model}_{args.W}_{args.alpha}_{args.batch_size}_{args.num_ng}@{args.best_k}.csv")
+        train_logs_file = os.path.join(RUNS_DIR, f"train_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}_{args.num_ng}@{args.best_k}.csv")
+        valid_logs_file = os.path.join(RUNS_DIR, f"valid_logs_{args.model}_{args.W}_{args.alpha}_{args.batch_size}_{args.num_ng}@{args.best_k}.csv")
 
         ## Clear File contents before run
         open(training_losses_file, 'w').close()
